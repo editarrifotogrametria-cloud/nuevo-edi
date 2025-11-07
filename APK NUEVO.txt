@@ -1,0 +1,2737 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Satellite, MapPin, BarChart3, Settings, Save, Download, Trash2, Play, Pause, Radio, Target, Database, Wifi, WifiOff, Activity, Menu, X, AlertCircle, CheckCircle, Globe, Plus, RefreshCw, Navigation, Clock, Monitor, Sliders, Zap, Shield } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+
+const GNSSAIApp = () => {
+  const [activeSection, setActiveSection] = useState('live');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [deviceConnected, setDeviceConnected] = useState(false);
+  const [loraConnected, setLoraConnected] = useState(false);
+  const [ntripConnected, setNtripConnected] = useState(false);
+  const [notification, setNotification] = useState(null);
+  const [currentProject, setCurrentProject] = useState(null);
+  const [projects, setProjects] = useState([]);
+  const [points, setPoints] = useState([]);
+  const [mode, setMode] = useState('rover');
+  
+  const [gnssData, setGnssData] = useState({
+    latitude: -8.1116,
+    longitude: -79.0288,
+    altitude: 25.0,
+    north: 9101234.567,
+    east: 705432.123,
+    accuracy: 0.012,
+    satellites: 42,
+    fixType: 'Sin solución',
+    hdop: 0.8,
+    pdop: 1.4,
+    age: 1,
+    gps: 12,
+    glonass: 6,
+    galileo: 8,
+    beidou: 5,
+    qzss: 3
+  });
+
+  const [imuData, setImuData] = useState({
+    tiltAngle: 0,
+    tiltCompensation: false,
+    gyroX: 0,
+    gyroY: 0,
+    gyroZ: 0,
+    accelX: 0,
+    accelY: 0,
+    accelZ: 0,
+    heading: 0,
+    pitch: 0,
+    roll: 0,
+    imuRate: 100,
+    imuCalibrated: false,
+    fusionMode: 'GNSS+IMU',
+    deadReckoning: false
+  });
+
+  const [pppData, setPppData] = useState({
+    enabled: false,
+    convergenceTime: 0,
+    converged: false,
+    targetTime: 1200 // 20 minutos
+  });
+
+  const [galileoHAS, setGalileoHAS] = useState({
+    enabled: false,
+    convergenceTime: 0,
+    converged: false,
+    targetTime: 300, // 5 minutos
+    signalQuality: 0
+  });
+
+  const [stakeoutMode, setStakeoutMode] = useState(false);
+  const [stakeoutTarget, setStakeoutTarget] = useState(null);
+  const [stakeoutDistance, setStakeoutDistance] = useState(0);
+  const [stakeoutBearing, setStakeoutBearing] = useState(0);
+
+  const ellipsoids = [
+    { value: 'WGS84', name: 'WGS84 (GPS estándar)', semiMajor: 6378137.0, semiMinor: 6356752.314, flattening: 1/298.257223563 },
+    { value: 'WGS84-IGN', name: 'WGS84-IGN (Perú oficial)', semiMajor: 6378137.0, semiMinor: 6356752.31424, flattening: 1/298.257223563, official: true },
+    { value: 'GRS80', name: 'GRS80 (Sistema Geodésico 1980)', semiMajor: 6378137.0, semiMinor: 6356752.314, flattening: 1/298.257222101 },
+    { value: 'PSAD56', name: 'PSAD56 (Peru - Datum antiguo)', semiMajor: 6378388.0, semiMinor: 6356911.946, flattening: 1/297.0 },
+    { value: 'SIRGAS2000', name: 'SIRGAS2000 (Sudamérica)', semiMajor: 6378137.0, semiMinor: 6356752.314, flattening: 1/298.257222101 }
+  ];
+
+  const geoidModels = [
+    { value: 'NONE', name: 'Sin corrección geoidal', description: 'Solo altura elipsoidal', resolution: '-' },
+    { value: 'EGM96', name: 'EGM96 (Global)', description: 'Modelo global, precisión ~1m', resolution: '15\' (~30km)' },
+    { value: 'EGM08', name: 'EGM08 (Alta resolución)', description: 'Resolución 2.5 arcmin, precisión ~10cm', resolution: '2.5\' (~5km)' },
+    { value: 'EGM08-25', name: 'EGM08-25 (Perú IGN)', description: 'Modelo oficial IGN Perú', resolution: '25km' },
+    { value: 'CUSTOM', name: 'Ondulación personalizada', description: 'Ingresa valor N manualmente', resolution: '-' }
+  ];
+
+  const peruGeoidZones = [
+    { region: 'Costa Norte', departments: 'Tumbes, Piura, Lambayeque', undulation: 29.0, range: '28-30m' },
+    { region: 'Costa Centro', departments: 'La Libertad, Lima, Ica', undulation: 30.0, range: '29-31m' },
+    { region: 'Costa Sur', departments: 'Arequipa, Moquegua, Tacna', undulation: 28.0, range: '27-29m' },
+    { region: 'Sierra Norte', departments: 'Cajamarca, Amazonas', undulation: 25.5, range: '24-27m' },
+    { region: 'Sierra Centro', departments: 'Ancash, Huánuco, Pasco, Junín', undulation: 26.5, range: '25-28m' },
+    { region: 'Sierra Sur', departments: 'Cusco, Puno, Apurímac, Ayacucho', undulation: 24.0, range: '22-26m' },
+    { region: 'Selva Norte', departments: 'Loreto, San Martín', undulation: 33.0, range: '30-35m' },
+    { region: 'Selva Centro-Sur', departments: 'Ucayali, Madre de Dios', undulation: 32.0, range: '30-34m' }
+  ];
+
+  const [ethernetConfig, setEthernetConfig] = useState({
+    enabled: false,
+    ipAddress: '192.168.1.100',
+    netmask: '255.255.255.0',
+    gateway: '192.168.1.1',
+    port: 8888
+  });
+
+  const [photos, setPhotos] = useState([]);
+  const [tracks, setTracks] = useState([]);
+
+  const [tiltWarning, setTiltWarning] = useState(false);
+
+  const k922Commands = {
+    imu: [
+      { name: 'TILT ON', cmd: 'TILTCOMPENSATION ENABLE', desc: 'Activa compensación de inclinación' },
+      { name: 'TILT OFF', cmd: 'TILTCOMPENSATION DISABLE', desc: 'Desactiva TILT' },
+      { name: 'Calibrar IMU', cmd: 'IMUCALIBRATE', desc: 'Mantén quieto 30s' },
+      { name: 'IMU 100Hz', cmd: 'IMURATE 100', desc: 'Máxima frecuencia IMU' },
+      { name: 'IMU 50Hz', cmd: 'IMURATE 50', desc: 'Frecuencia media' },
+      { name: 'Estado IMU', cmd: 'LOG IMUSTATUS ONCE', desc: 'Ver estado actual' }
+    ],
+    positioning: [
+      { name: 'Modo Rover', cmd: 'MODE ROVER', desc: 'Móvil con correcciones' },
+      { name: 'Modo Base', cmd: 'MODE BASE', desc: 'Estación base fija' },
+      { name: 'PPP Enable', cmd: 'PPP ENABLE', desc: 'Activar PPP (requiere WiFi)' },
+      { name: 'PPP Disable', cmd: 'PPP DISABLE', desc: 'Desactivar PPP' },
+      { name: 'Reset RTK', cmd: 'RTKRESET', desc: 'Reiniciar RTK' },
+      { name: 'Guardar', cmd: 'SAVECONFIG', desc: 'Guardar en flash' }
+    ],
+    gnss: [
+      { name: 'GPS ON', cmd: 'GPSENABLE', desc: 'Activar GPS L1/L2/L5' },
+      { name: 'GLONASS ON', cmd: 'GLONASSENABLE', desc: 'Activar GLONASS' },
+      { name: 'Galileo ON', cmd: 'GALILEOENABLE', desc: 'Activar Galileo E1/E5' },
+      { name: 'BeiDou ON', cmd: 'BEIDOUENABLE', desc: 'Activar BeiDou' },
+      { name: 'QZSS ON', cmd: 'QZSSENABLE', desc: 'Activar QZSS (Japón)' },
+      { name: 'Ver sistemas', cmd: 'LOG SATVIS', desc: 'Constelaciones activas' }
+    ],
+    output: [
+      { name: 'GGA 5Hz', cmd: 'GPGGA COM1 5.0', desc: 'NMEA estándar' },
+      { name: 'GGA 10Hz', cmd: 'GPGGA COM1 10.0', desc: 'Alta frecuencia' },
+      { name: 'RMC 5Hz', cmd: 'GPRMC COM1 5.0', desc: 'Velocidad incluida' },
+      { name: 'Binary POS', cmd: 'BESTPOS COM1 5.0', desc: 'ComNav binario' },
+      { name: 'RTCM Out', cmd: 'RTCM1004 COM2 1.0', desc: 'Para base' },
+      { name: 'Ver logs', cmd: 'LOG', desc: 'Logs activos' }
+    ]
+  };
+
+  const [satelliteData, setSatelliteData] = useState([]);
+  const [snrHistory, setSnrHistory] = useState([]);
+  const [sessionTime, setSessionTime] = useState(0);
+  const [epochs, setEpochs] = useState(0);
+
+  const [config, setConfig] = useState({
+    coordinateSystem: 'UTM',
+    zone: '17S',
+    minAccuracy: 0.050,
+    soundEnabled: true,
+    autoSaveInterval: 30,
+    cutoffAngle: 15,
+    multipathMitigation: true,
+    antiJamming: false,
+    instrumentHeight: 1.500, // Altura del bastón en metros
+    ellipsoid: 'WGS84', // Elipsoide
+    geoidModel: 'EGM08', // Modelo geoidal
+    geoidUndulation: 30.0 // Ondulación geoidal en metros (N)
+  });
+
+  const [ntripConfig, setNtripConfig] = useState({
+    serverHost: '10.0.0.9',
+    serverPort: '3101',
+    casterPort: '4101',
+    mountpoint: 'H2K_SHOP',
+    username: '',
+    password: ''
+  });
+
+  const [loraConfig, setLoraConfig] = useState({
+    channel: 1,
+    dataRate: '9.6',
+    transmissionPower: 20,
+    frequency: 915 // MHz: 433, 470, 868, 915
+  });
+
+  const [knownBaseConfig, setKnownBaseConfig] = useState({
+    latitude: '',
+    longitude: '',
+    elevation: '',
+    minAccuracy: 1
+  });
+
+  const [terminalLogs, setTerminalLogs] = useState([
+    { time: '00:00:00', type: 'system', message: '>> Sistema: GNSS.AI v1.0 iniciado correctamente' },
+    { time: '00:00:01', type: 'info', message: '>> Info: Esperando conexión de dispositivo GNSS...' }
+  ]);
+
+  const canvasRef = useRef(null);
+  const terminalRef = useRef(null);
+
+  const showNotification = (message, type) => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  const addTerminalLog = (message, type = 'info') => {
+    const now = new Date();
+    const time = now.toTimeString().split(' ')[0];
+    const prefix = type === 'success' ? '>>' : type === 'error' ? '!!' : type === 'warning' ? '<<' : '>>';
+    setTerminalLogs(prev => [...prev, { time, type, message: `${prefix} ${message}` }]);
+  };
+
+  useEffect(() => {
+    if (terminalRef.current) {
+      terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
+    }
+  }, [terminalLogs]);
+
+  useEffect(() => {
+    loadData();
+    generateSatelliteData();
+  }, []);
+
+  useEffect(() => {
+    if (!isRecording) return;
+    
+    const interval = setInterval(() => {
+      setSessionTime(prev => prev + 1);
+      setEpochs(prev => prev + 1);
+      
+      // Simular inclinación del bastón
+      const tilt = Math.random() * 35; // 0-35 grados
+      setTiltWarning(tilt > 30);
+      
+      // Simular Dead Reckoning (activado cuando no hay correcciones)
+      const drActive = !ntripConnected && !loraConnected && deviceConnected;
+      
+      setImuData(prev => ({
+        ...prev,
+        tiltAngle: tilt,
+        deadReckoning: drActive,
+        gyroX: (Math.random() - 0.5) * 10,
+        gyroY: (Math.random() - 0.5) * 10,
+        gyroZ: (Math.random() - 0.5) * 10,
+        accelX: (Math.random() - 0.5) * 0.2,
+        accelY: (Math.random() - 0.5) * 0.2,
+        accelZ: 1.0 + (Math.random() - 0.5) * 0.1,
+        heading: 45 + (Math.random() - 0.5) * 5,
+        pitch: tilt,
+        roll: (Math.random() - 0.5) * 5
+      }));
+
+      // Simular convergencia PPP
+      if (pppData.enabled && !pppData.converged) {
+        setPppData(prev => {
+          const newTime = prev.convergenceTime + 1;
+          return {
+            ...prev,
+            convergenceTime: newTime,
+            converged: newTime >= prev.targetTime
+          };
+        });
+      }
+      
+      setGnssData(prev => ({
+        ...prev,
+        latitude: prev.latitude + (Math.random() - 0.5) * 0.00001,
+        longitude: prev.longitude + (Math.random() - 0.5) * 0.00001,
+        altitude: prev.altitude + (Math.random() - 0.5) * 0.5,
+        north: prev.north + (Math.random() - 0.5) * 0.01,
+        east: prev.east + (Math.random() - 0.5) * 0.01,
+        accuracy: tilt > 30 ? 0.015 + Math.random() * 0.010 : 0.008 + Math.random() * 0.004,
+        satellites: Math.floor(38 + Math.random() * 8),
+        fixType: ntripConnected || loraConnected ? 'FIX' : drActive ? 'DR' : 'Sin solución'
+      }));
+
+      setSnrHistory(prev => {
+        const newData = {
+          time: new Date().toLocaleTimeString(),
+          gps: 35 + Math.random() * 10,
+          glonass: 33 + Math.random() * 10,
+          galileo: 37 + Math.random() * 10,
+          beidou: 32 + Math.random() * 10
+        };
+        return [...prev.slice(-19), newData];
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isRecording, ntripConnected, loraConnected, deviceConnected, pppData.enabled, pppData.converged]);
+
+  const generateSatelliteData = () => {
+    const sats = [];
+    const constellations = [
+      { prefix: 'G', count: 12, name: 'GPS' },
+      { prefix: 'R', count: 6, name: 'GLONASS' },
+      { prefix: 'E', count: 8, name: 'Galileo' },
+      { prefix: 'C', count: 5, name: 'BeiDou' },
+      { prefix: 'J', count: 3, name: 'QZSS' }
+    ];
+
+    constellations.forEach(({ prefix, count, name }) => {
+      for (let i = 1; i <= count; i++) {
+        sats.push({
+          id: prefix + i.toString().padStart(2, '0'),
+          constellation: name,
+          elevation: Math.random() * 90,
+          azimuth: Math.random() * 360,
+          snr: 25 + Math.random() * 25,
+          used: Math.random() > 0.2
+        });
+      }
+    });
+    setSatelliteData(sats);
+  };
+
+  useEffect(() => {
+    if (activeSection === 'skyplot' && canvasRef.current) {
+      drawSkyplot();
+    }
+  }, [activeSection, satelliteData]);
+
+  const drawSkyplot = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const radius = Math.min(width, height) / 2 - 40;
+
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 2;
+    [1, 0.75, 0.5, 0.25].forEach((factor, i) => {
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius * factor, 0, 2 * Math.PI);
+      ctx.stroke();
+      
+      ctx.fillStyle = '#64748b';
+      ctx.font = '12px monospace';
+      ctx.fillText((90 - i * 30) + '°', centerX + radius * factor + 8, centerY);
+    });
+
+    ctx.strokeStyle = '#475569';
+    ['N', 'E', 'S', 'W'].forEach((dir, i) => {
+      const angle = (i * 90 - 90) * Math.PI / 180;
+      const x2 = centerX + Math.cos(angle) * radius * 1.08;
+      const y2 = centerY + Math.sin(angle) * radius * 1.08;
+      
+      ctx.beginPath();
+      ctx.moveTo(centerX, centerY);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+      
+      ctx.fillStyle = '#e2e8f0';
+      ctx.font = 'bold 16px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(dir, x2, y2 + (i === 2 ? 24 : -12));
+    });
+
+    const colors = {
+      GPS: '#3b82f6',
+      GLONASS: '#ef4444',
+      Galileo: '#10b981',
+      BeiDou: '#f59e0b',
+      QZSS: '#a855f7'
+    };
+
+    satelliteData.forEach(sat => {
+      const elevRad = (90 - sat.elevation) * Math.PI / 180;
+      const azRad = (sat.azimuth - 90) * Math.PI / 180;
+      const dist = radius * (90 - sat.elevation) / 90;
+      
+      const x = centerX + dist * Math.cos(azRad);
+      const y = centerY + dist * Math.sin(azRad);
+      
+      ctx.fillStyle = sat.used ? colors[sat.constellation] : '#475569';
+      ctx.beginPath();
+      ctx.arc(x, y, sat.snr / 4.5, 0, 2 * Math.PI);
+      ctx.fill();
+      
+      if (sat.used) {
+        ctx.strokeStyle = colors[sat.constellation];
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+      }
+      
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 10px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(sat.id.substring(1), x, y + 4);
+    });
+  };
+
+  const loadData = async () => {
+    try {
+      const projectsRes = await window.storage.get('gnssai-projects').catch(() => null);
+      const pointsRes = await window.storage.get('gnssai-points').catch(() => null);
+      
+      if (projectsRes && projectsRes.value) setProjects(JSON.parse(projectsRes.value));
+      if (pointsRes && pointsRes.value) setPoints(JSON.parse(pointsRes.value));
+    } catch (error) {
+      console.log('Cargando datos por defecto');
+    }
+  };
+
+  const saveData = async () => {
+    try {
+      await window.storage.set('gnssai-projects', JSON.stringify(projects));
+      await window.storage.set('gnssai-points', JSON.stringify(points));
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (projects.length > 0 || points.length > 0) {
+      saveData();
+    }
+  }, [projects, points]);
+
+  const createProject = (name) => {
+    const newProject = {
+      id: Date.now(),
+      name,
+      created: new Date().toISOString(),
+      coordinateSystem: config.coordinateSystem,
+      zone: config.zone,
+      pointCount: 0
+    };
+    setProjects([...projects, newProject]);
+    setCurrentProject(newProject);
+    showNotification('Proyecto creado: ' + name, 'success');
+    addTerminalLog(`Proyecto creado: ${name}`, 'success');
+  };
+
+  const savePoint = (name, code, note) => {
+    if (!currentProject) {
+      showNotification('Selecciona un proyecto', 'error');
+      return;
+    }
+    
+    if (gnssData.accuracy > config.minAccuracy) {
+      showNotification('Precisión insuficiente: ' + gnssData.accuracy.toFixed(3) + 'm', 'error');
+      return;
+    }
+    
+    const newPoint = {
+      id: Date.now(),
+      projectId: currentProject.id,
+      name,
+      code: code || '',
+      latitude: gnssData.latitude,
+      longitude: gnssData.longitude,
+      altitude: gnssData.altitude,
+      north: gnssData.north,
+      east: gnssData.east,
+      accuracy: gnssData.accuracy,
+      satellites: gnssData.satellites,
+      fixType: gnssData.fixType,
+      timestamp: new Date().toISOString(),
+      note: note || ''
+    };
+    
+    setPoints([...points, newPoint]);
+    setProjects(projects.map(p => 
+      p.id === currentProject.id ? { ...p, pointCount: p.pointCount + 1 } : p
+    ));
+    showNotification('Punto guardado: ' + name, 'success');
+    addTerminalLog(`Punto guardado: ${name} [${gnssData.accuracy.toFixed(3)}m]`, 'success');
+  };
+
+  const deletePoint = (pointId) => {
+    setPoints(points.filter(p => p.id !== pointId));
+    showNotification('Punto eliminado', 'info');
+  };
+
+  const connectNTRIP = () => {
+    setNtripConnected(true);
+    setGnssData({...gnssData, fixType: 'FIX'});
+    showNotification('NTRIP conectado', 'success');
+    addTerminalLog(`NTRIP Server conectado: ${ntripConfig.serverHost}:${ntripConfig.serverPort}`, 'success');
+    addTerminalLog(`Mountpoint: ${ntripConfig.mountpoint}`, 'info');
+    addTerminalLog('Recibiendo correcciones RTK...', 'success');
+  };
+
+  const disconnectNTRIP = () => {
+    setNtripConnected(false);
+    setGnssData({...gnssData, fixType: 'Sin solución'});
+    showNotification('NTRIP desconectado', 'info');
+    addTerminalLog('NTRIP desconectado', 'warning');
+  };
+
+  const connectLoRa = () => {
+    setLoraConnected(true);
+    setGnssData({...gnssData, fixType: 'FIX'});
+    showNotification('LoRa conectado', 'success');
+    addTerminalLog(`LoRa conectado - Canal ${loraConfig.channel}, ${loraConfig.dataRate}kbps, ${loraConfig.transmissionPower}dBm`, 'success');
+  };
+
+  const disconnectLoRa = () => {
+    setLoraConnected(false);
+    setGnssData({...gnssData, fixType: 'Sin solución'});
+    showNotification('LoRa desconectado', 'info');
+    addTerminalLog('LoRa desconectado', 'warning');
+  };
+
+  const getFixColor = (fixType) => {
+    if (fixType === 'FIX') return 'text-green-400';
+    if (fixType === 'Float') return 'text-yellow-400';
+    if (fixType === 'DR') return 'text-purple-400';
+    return 'text-red-400';
+  };
+
+  const getFixBg = (fixType) => {
+    if (fixType === 'FIX') return 'bg-green-500/20 border-green-500';
+    if (fixType === 'Float') return 'bg-yellow-500/20 border-yellow-500';
+    if (fixType === 'DR') return 'bg-purple-500/20 border-purple-500';
+    return 'bg-red-500/20 border-red-500';
+  };
+
+  const currentProjectPoints = points.filter(p => currentProject && p.projectId === currentProject.id);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-950 text-white pb-24">
+      {notification && (
+        <div className={'fixed top-20 left-1/2 transform -translate-x-1/2 z-50 px-6 py-3 rounded-lg border backdrop-blur-lg shadow-lg ' + (
+          notification.type === 'success' ? 'bg-green-500/20 border-green-500 text-green-400' :
+          notification.type === 'error' ? 'bg-red-500/20 border-red-500 text-red-400' :
+          'bg-blue-500/20 border-blue-500 text-blue-400'
+        )}>
+          <div className="flex items-center gap-2">
+            <CheckCircle className="w-5 h-5" />
+            <span className="font-medium">{notification.message}</span>
+          </div>
+        </div>
+      )}
+      
+      <div className="bg-gradient-to-r from-blue-700 to-blue-600 px-4 py-4 flex items-center justify-between shadow-2xl sticky top-0 z-40">
+        <button onClick={() => setMenuOpen(true)} className="p-2 hover:bg-blue-600/50 rounded-lg">
+          <Menu className="w-6 h-6" />
+        </button>
+        <div className="text-center flex-1">
+          <div className="flex items-center justify-center gap-2">
+            <Satellite className="w-5 h-5" />
+            <h1 className="font-bold text-lg">GNSS.AI</h1>
+          </div>
+          <p className="text-xs text-blue-100">
+            {!deviceConnected && 'Desconectado'}
+            {deviceConnected && gnssData.fixType === 'Sin solución' && '⚠️ Sin solución'}
+            {deviceConnected && gnssData.fixType === 'FIX' && '✅ FIX'}
+          </p>
+        </div>
+        <button 
+          onClick={() => {
+            setDeviceConnected(!deviceConnected);
+            showNotification(deviceConnected ? 'Desconectado' : 'Conectado', 'success');
+            addTerminalLog(deviceConnected ? 'Dispositivo desconectado' : 'Dispositivo conectado', deviceConnected ? 'warning' : 'success');
+          }}
+          className="p-2 hover:bg-blue-600/50 rounded-lg"
+        >
+          {deviceConnected ? <Wifi className="w-6 h-6" /> : <WifiOff className="w-6 h-6" />}
+        </button>
+      </div>
+
+      {menuOpen && (
+        <div className="fixed inset-0 bg-black/60 z-50" onClick={() => setMenuOpen(false)}>
+          <div className="absolute left-0 top-0 h-full w-80 bg-slate-900 shadow-2xl overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="bg-blue-700 p-6 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Satellite className="w-8 h-8" />
+                <div>
+                  <h2 className="font-bold text-xl">GNSS.AI</h2>
+                  <p className="text-xs text-blue-200">Sistema RTK Profesional</p>
+                </div>
+              </div>
+              <button onClick={() => setMenuOpen(false)} className="p-2">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-2">
+              <button onClick={() => { setActiveSection('live'); setMenuOpen(false); }} className="w-full text-left px-4 py-3 hover:bg-slate-700 rounded-lg">📍 Vista en Vivo</button>
+              <button onClick={() => { setActiveSection('imu'); setMenuOpen(false); }} className="w-full text-left px-4 py-3 hover:bg-slate-700 rounded-lg">📐 IMU & Tilt</button>
+              <button onClick={() => { setActiveSection('gnssai-config'); setMenuOpen(false); }} className="w-full text-left px-4 py-3 hover:bg-slate-700 rounded-lg">🎛️ Configuración GNSS.AI</button>
+              <button onClick={() => { setActiveSection('photos'); setMenuOpen(false); }} className="w-full text-left px-4 py-3 hover:bg-slate-700 rounded-lg">📷 Fotogrametría</button>
+              <button onClick={() => { setActiveSection('ppp'); setMenuOpen(false); }} className="w-full text-left px-4 py-3 hover:bg-slate-700 rounded-lg">🌐 PPP</button>
+              <button onClick={() => { setActiveSection('status'); setMenuOpen(false); }} className="w-full text-left px-4 py-3 hover:bg-slate-700 rounded-lg">📊 Estado General</button>
+              <button onClick={() => { setActiveSection('mode'); setMenuOpen(false); }} className="w-full text-left px-4 py-3 hover:bg-slate-700 rounded-lg">⚙️ Modo GNSS</button>
+              <button onClick={() => { setActiveSection('ntrip'); setMenuOpen(false); }} className="w-full text-left px-4 py-3 hover:bg-slate-700 rounded-lg">📡 Configuración NTRIP</button>
+              <button onClick={() => { setActiveSection('lora'); setMenuOpen(false); }} className="w-full text-left px-4 py-3 hover:bg-slate-700 rounded-lg">📻 Configuración LoRa</button>
+              <button onClick={() => { setActiveSection('terminal'); setMenuOpen(false); }} className="w-full text-left px-4 py-3 hover:bg-slate-700 rounded-lg">💻 Terminal</button>
+              <button onClick={() => { setActiveSection('settings'); setMenuOpen(false); }} className="w-full text-left px-4 py-3 hover:bg-slate-700 rounded-lg">🔧 Configuración</button>
+              <button onClick={() => { setActiveSection('projects'); setMenuOpen(false); }} className="w-full text-left px-4 py-3 hover:bg-slate-700 rounded-lg">📁 Proyectos</button>
+              <button onClick={() => { setActiveSection('points'); setMenuOpen(false); }} className="w-full text-left px-4 py-3 hover:bg-slate-700 rounded-lg">📌 Biblioteca de Puntos</button>
+              <button onClick={() => { setActiveSection('skyplot'); setMenuOpen(false); }} className="w-full text-left px-4 py-3 hover:bg-slate-700 rounded-lg">🛰️ Skyplot</button>
+              <button onClick={() => { setActiveSection('snr'); setMenuOpen(false); }} className="w-full text-left px-4 py-3 hover:bg-slate-700 rounded-lg">📈 Gráficos SNR</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="p-4 max-w-7xl mx-auto">
+        
+        {activeSection === 'live' && (
+          <div className="space-y-4">
+            <div className="bg-slate-800/90 backdrop-blur-xl rounded-2xl p-5 border border-slate-700">
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-3">
+                  <div className={'w-4 h-4 rounded-full ' + (deviceConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500')} />
+                  <span className="text-lg font-bold">{mode.toUpperCase()}</span>
+                  {isRecording && (
+                    <span className="text-sm bg-red-500/20 text-red-400 px-3 py-1 rounded-full flex items-center gap-2">
+                      <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                      {Math.floor(sessionTime / 60)}:{(sessionTime % 60).toString().padStart(2, '0')}
+                    </span>
+                  )}
+                </div>
+                <div className={'px-4 py-2 rounded-full text-sm font-bold border-2 ' + getFixBg(gnssData.fixType)}>
+                  {gnssData.fixType}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="bg-gradient-to-br from-blue-500/10 to-blue-600/10 p-4 rounded-xl border border-blue-500/30">
+                  <div className="text-slate-400 text-xs mb-2">SATÉLITES</div>
+                  <div className="text-2xl font-bold flex items-center gap-2">
+                    <Satellite className="w-6 h-6 text-blue-400" />
+                    {gnssData.satellites}
+                  </div>
+                  <div className="text-xs text-slate-500 mt-1">
+                    G:{gnssData.gps} R:{gnssData.glonass} E:{gnssData.galileo} C:{gnssData.beidou} Q:{gnssData.qzss}
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-br from-green-500/10 to-green-600/10 p-4 rounded-xl border border-green-500/30">
+                  <div className="text-slate-400 text-xs mb-2">PRECISIÓN</div>
+                  <div className="text-2xl font-bold text-green-400">
+                    ±{gnssData.accuracy.toFixed(3)}m
+                  </div>
+                  <div className="text-xs text-slate-500 mt-1">
+                    HDOP: {gnssData.hdop.toFixed(2)}
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-br from-yellow-500/10 to-yellow-600/10 p-4 rounded-xl border border-yellow-500/30">
+                  <div className="text-slate-400 text-xs mb-2">EDAD</div>
+                  <div className="text-2xl font-bold text-yellow-400">
+                    {gnssData.age}s
+                  </div>
+                  <div className="text-xs text-slate-500 mt-1">
+                    PDOP: {gnssData.pdop.toFixed(2)}
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-br from-purple-500/10 to-purple-600/10 p-4 rounded-xl border border-purple-500/30">
+                  <div className="text-slate-400 text-xs mb-2">CORRECCIONES</div>
+                  <div className="text-lg font-bold flex items-center gap-2">
+                    {(ntripConnected || loraConnected) && <Radio className="w-6 h-6 text-green-400" />}
+                    {!ntripConnected && !loraConnected && <Radio className="w-6 h-6 text-red-400" />}
+                  </div>
+                  <div className="text-xs text-slate-400 mt-1">
+                    {ntripConnected && 'NTRIP'}
+                    {loraConnected && 'LoRa'}
+                    {!ntripConnected && !loraConnected && 'Desconectado'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-800/90 backdrop-blur-xl rounded-2xl p-5 border border-slate-700">
+              <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                <Globe className="w-6 h-6 text-blue-400" />
+                Posición Actual
+              </h3>
+              
+              <div className="space-y-3 font-mono text-sm">
+                <div className="flex justify-between bg-slate-900/50 p-4 rounded-xl">
+                  <span className="text-slate-400">Latitud:</span>
+                  <span className="font-bold">{gnssData.latitude.toFixed(8)}°</span>
+                </div>
+                <div className="flex justify-between bg-slate-900/50 p-4 rounded-xl">
+                  <span className="text-slate-400">Longitud:</span>
+                  <span className="font-bold">{gnssData.longitude.toFixed(8)}°</span>
+                </div>
+                <div className="flex justify-between bg-slate-900/50 p-4 rounded-xl">
+                  <span className="text-slate-400">Altitud (elipsoidal):</span>
+                  <span className="font-bold">{gnssData.altitude.toFixed(3)} m</span>
+                </div>
+                <div className="flex justify-between bg-green-500/10 border border-green-500/30 p-4 rounded-xl">
+                  <span className="text-green-400 font-bold">Altura del punto:</span>
+                  <span className="font-bold text-green-400">{(gnssData.altitude - config.instrumentHeight).toFixed(3)} m</span>
+                </div>
+                {config.geoidModel !== 'NONE' && (
+                  <div className="flex justify-between bg-cyan-500/10 border border-cyan-500/30 p-4 rounded-xl">
+                    <span className="text-cyan-400 font-bold">Alt. ortométrica (snm):</span>
+                    <span className="font-bold text-cyan-400">{(gnssData.altitude - config.instrumentHeight - config.geoidUndulation).toFixed(3)} m</span>
+                  </div>
+                )}
+                <div className="flex justify-between bg-blue-500/10 p-4 rounded-xl text-xs">
+                  <span className="text-slate-400">Altura instrumento:</span>
+                  <span className="text-blue-400">{config.instrumentHeight.toFixed(3)} m</span>
+                </div>
+                {config.geoidModel !== 'NONE' && (
+                  <div className="flex justify-between bg-purple-500/10 p-4 rounded-xl text-xs">
+                    <span className="text-slate-400">Ondulación geoidal (N):</span>
+                    <span className="text-purple-400">{config.geoidUndulation.toFixed(3)} m ({config.geoidModel})</span>
+                  </div>
+                )}
+                
+                <div className="pt-3 border-t border-slate-700">
+                  <div className="text-slate-400 text-sm mb-3 font-bold flex items-center justify-between">
+                    <span>UTM - Zona {config.zone}</span>
+                    <span className="text-xs text-cyan-400">({config.ellipsoid})</span>
+                  </div>
+                  <div className="flex justify-between bg-slate-900/50 p-4 rounded-xl mb-3">
+                    <span className="text-slate-400">Norte:</span>
+                    <span className="font-bold">{gnssData.north.toFixed(3)} m</span>
+                  </div>
+                  <div className="flex justify-between bg-slate-900/50 p-4 rounded-xl">
+                    <span className="text-slate-400">Este:</span>
+                    <span className="font-bold">{gnssData.east.toFixed(3)} m</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => {
+                    setIsRecording(!isRecording);
+                    showNotification(isRecording ? 'Grabación detenida' : 'Grabación iniciada', 'success');
+                    addTerminalLog(isRecording ? 'Logging detenido' : 'Logging iniciado', isRecording ? 'warning' : 'success');
+                    if (!isRecording) {
+                      setSessionTime(0);
+                      setEpochs(0);
+                    }
+                  }}
+                  className={'py-4 rounded-xl flex items-center justify-center gap-2 font-bold transition-all ' + (
+                    isRecording ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'
+                  )}
+                >
+                  {isRecording ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
+                  {isRecording ? 'Detener' : 'Iniciar'}
+                </button>
+
+                <button
+                  onClick={() => {
+                    if (!currentProject) {
+                      showNotification('Selecciona un proyecto', 'error');
+                      return;
+                    }
+                    const name = prompt('Nombre del punto:');
+                    if (!name) return;
+                    const code = prompt('Código (opcional):');
+                    const note = prompt('Nota (opcional):');
+                    savePoint(name, code, note);
+                  }}
+                  disabled={!isRecording || !currentProject}
+                  className="bg-blue-500 hover:bg-blue-600 disabled:bg-slate-700 disabled:cursor-not-allowed py-4 rounded-xl flex items-center justify-center gap-2 font-bold transition-all"
+                >
+                  <Save className="w-6 h-6" />
+                  Guardar
+                </button>
+              </div>
+
+              {gnssData.accuracy > config.minAccuracy && (
+                <div className="mt-4 p-4 bg-red-500/20 border border-red-500/50 rounded-xl text-red-200 text-sm flex items-center gap-3">
+                  <AlertCircle className="w-5 h-5" />
+                  Precisión insuficiente: {gnssData.accuracy.toFixed(3)}m (mínimo: {config.minAccuracy.toFixed(3)}m)
+                </div>
+              )}
+
+              {tiltWarning && (
+                <div className="mt-4 p-4 bg-orange-500/20 border border-orange-500/50 rounded-xl text-orange-200 text-sm flex items-center gap-3">
+                  <AlertCircle className="w-5 h-5" />
+                  ⚠️ Inclinación detectada: {imuData.tiltAngle.toFixed(1)}° | Compensación TILT {imuData.tiltCompensation ? 'ACTIVA' : 'INACTIVA'}
+                </div>
+              )}
+
+              {!currentProject && (
+                <div className="mt-4 p-4 bg-yellow-500/20 border border-yellow-500/50 rounded-xl text-yellow-200 text-sm flex items-center gap-3">
+                  <AlertCircle className="w-5 h-5" />
+                  Selecciona o crea un proyecto para guardar puntos
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeSection === 'imu' && (
+          <div className="space-y-4">
+            <div className="bg-slate-800/90 backdrop-blur-xl rounded-2xl p-5 border border-slate-700">
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <Activity className="w-7 h-7 text-purple-400" />
+                  IMU & Compensación TILT
+                </h2>
+                <button 
+                  onClick={() => {
+                    setImuData({...imuData, tiltCompensation: !imuData.tiltCompensation});
+                    showNotification('Compensación TILT ' + (!imuData.tiltCompensation ? 'activada' : 'desactivada'), 'success');
+                    addTerminalLog(`TILT compensation ${!imuData.tiltCompensation ? 'ON' : 'OFF'}`, 'info');
+                  }}
+                  className={'px-4 py-2 rounded-lg font-bold ' + (imuData.tiltCompensation ? 'bg-green-500' : 'bg-slate-600')}
+                >
+                  {imuData.tiltCompensation ? '✓ ACTIVO' : 'INACTIVO'}
+                </button>
+              </div>
+
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 mb-4">
+                <div className="text-sm text-blue-300 mb-2">ℹ️ El módulo GNSS.AI tiene IMU integrado (giroscopio + acelerómetro)</div>
+                <div className="text-xs text-slate-400">
+                  Con la compensación TILT activada, puedes inclinar el bastón hasta <span className="font-bold text-green-400">30°</span> y mantener precisión RTK centimétrica.
+                  <div className="mt-2 text-yellow-300">⚠️ Debes activar TILT mediante comandos en Configuración GNSS.AI</div>
+                </div>
+              </div>
+
+              {imuData.deadReckoning && (
+                <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-4 mb-4">
+                  <div className="flex items-center gap-2 text-purple-400 mb-2">
+                    <Navigation className="w-5 h-5" />
+                    <span className="font-bold">Dead Reckoning ACTIVO</span>
+                  </div>
+                  <div className="text-sm text-slate-300">
+                    El K922 está usando navegación inercial (IMU) para mantener la posición sin correcciones GNSS.
+                    Error acumulado: ~3% de distancia recorrida.
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-slate-900/50 p-4 rounded-xl">
+                  <div className="text-center mb-4">
+                    <div className="text-6xl font-bold" style={{
+                      color: imuData.tiltAngle > 30 ? '#ef4444' : imuData.tiltAngle > 20 ? '#f59e0b' : '#10b981'
+                    }}>
+                      {imuData.tiltAngle.toFixed(1)}°
+                    </div>
+                    <div className="text-sm text-slate-400 mt-2">Ángulo de inclinación</div>
+                  </div>
+                  <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full transition-all"
+                      style={{
+                        width: `${(imuData.tiltAngle / 45) * 100}%`,
+                        backgroundColor: imuData.tiltAngle > 30 ? '#ef4444' : imuData.tiltAngle > 20 ? '#f59e0b' : '#10b981'
+                      }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-xs text-slate-500 mt-1">
+                    <span>0°</span>
+                    <span className="text-yellow-400">20°</span>
+                    <span className="text-red-400">30°</span>
+                    <span>45°</span>
+                  </div>
+                </div>
+
+                <div className="bg-slate-900/50 p-4 rounded-xl space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400 text-sm">Rumbo (Heading)</span>
+                    <span className="font-bold text-lg">{imuData.heading.toFixed(1)}°</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400 text-sm">Cabeceo (Pitch)</span>
+                    <span className="font-bold text-lg">{imuData.pitch.toFixed(1)}°</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400 text-sm">Balanceo (Roll)</span>
+                    <span className="font-bold text-lg">{imuData.roll.toFixed(1)}°</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-3 border-t border-slate-700">
+                    <span className="text-slate-400 text-sm">Frecuencia IMU</span>
+                    <span className="font-bold text-lg text-purple-400">{imuData.imuRate} Hz</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 bg-slate-900/50 p-4 rounded-xl">
+                <h3 className="font-bold mb-3 flex items-center gap-2">
+                  <Zap className="w-5 h-5 text-yellow-400" />
+                  Giroscopio (°/s)
+                </h3>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="text-center">
+                    <div className="text-xs text-slate-400">Eje X</div>
+                    <div className="font-mono font-bold">{imuData.gyroX.toFixed(2)}</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xs text-slate-400">Eje Y</div>
+                    <div className="font-mono font-bold">{imuData.gyroY.toFixed(2)}</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xs text-slate-400">Eje Z</div>
+                    <div className="font-mono font-bold">{imuData.gyroZ.toFixed(2)}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 bg-slate-900/50 p-4 rounded-xl">
+                <h3 className="font-bold mb-3 flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-green-400" />
+                  Acelerómetro (g)
+                </h3>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="text-center">
+                    <div className="text-xs text-slate-400">Eje X</div>
+                    <div className="font-mono font-bold">{imuData.accelX.toFixed(3)}</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xs text-slate-400">Eje Y</div>
+                    <div className="font-mono font-bold">{imuData.accelY.toFixed(3)}</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xs text-slate-400">Eje Z</div>
+                    <div className="font-mono font-bold">{imuData.accelZ.toFixed(3)}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 bg-green-500/10 border border-green-500/30 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <CheckCircle className="w-5 h-5 text-green-400 mt-1" />
+                  <div>
+                    <div className="font-bold text-green-400 mb-1">U-Fusion (Tight Coupling)</div>
+                    <div className="text-sm text-slate-300">
+                      El GNSS.AI utiliza algoritmo de navegación combinada GNSS+IMU para mantener precisión RTK 
+                      incluso con el bastón inclinado hasta 30-45°. Esto permite trabajar en terrenos difíciles 
+                      sin perder precisión.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeSection === 'gnssai-config' && (
+          <div className="bg-slate-800/90 backdrop-blur-xl rounded-2xl p-5 border border-slate-700">
+            <h2 className="text-xl font-bold mb-5 flex items-center gap-2">
+              <Settings className="w-7 h-7 text-blue-400" />
+              Comandos GNSS.AI
+            </h2>
+
+            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 mb-4">
+              <div className="flex items-center gap-2 text-yellow-400 mb-2">
+                <AlertCircle className="w-5 h-5" />
+                <span className="font-bold">Importante</span>
+              </div>
+              <div className="text-sm text-slate-300">
+                Estos comandos se envían al módulo por UART. Algunos requieren <strong>SAVECONFIG</strong> para persistir después del reinicio.
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
+                <div className="flex items-center gap-2 text-green-400 mb-2">
+                  <Target className="w-5 h-5" />
+                  <span className="font-bold">Configuración para GPS Diferencial</span>
+                </div>
+                <div className="text-sm text-slate-300">
+                  Configura la altura del instrumento y el elipsoide de referencia para obtener alturas precisas en tus levantamientos topográficos.
+                </div>
+              </div>
+
+              <div className="bg-slate-900/50 p-4 rounded-xl">
+                <label className="text-slate-400 text-sm mb-2 block flex items-center gap-2">
+                  <Activity className="w-4 h-4" />
+                  Modelo Geoidal (para altura sobre nivel del mar)
+                </label>
+                <select 
+                  value={config.geoidModel}
+                  onChange={(e) => {
+                    setConfig({...config, geoidModel: e.target.value});
+                    showNotification('Modelo geoidal: ' + e.target.value, 'success');
+                  }}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white"
+                >
+                  {geoidModels.map(gm => (
+                    <option key={gm.value} value={gm.value}>{gm.name}</option>
+                  ))}
+                </select>
+                <div className="mt-3 text-xs text-slate-400">
+                  {geoidModels.filter(g => g.value === config.geoidModel).map(gm => (
+                    <div key={gm.value} className="p-2 bg-slate-800/50 rounded space-y-1">
+                      <div>{gm.description}</div>
+                      <div className="text-purple-400">Resolución: {gm.resolution}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {config.geoidModel !== 'NONE' && (
+                  <div className="mt-3 space-y-3">
+                    <div className="p-3 bg-purple-500/10 rounded-lg border border-purple-500/30">
+                      <div className="text-xs text-purple-300 font-bold mb-3">📍 Selector rápido por zona (Perú)</div>
+                      <div className="text-xs text-slate-400 mb-2">Selecciona tu región para obtener la ondulación típica:</div>
+                      <div className="grid grid-cols-1 gap-2 max-h-64 overflow-y-auto">
+                        {peruGeoidZones.map((zone, i) => (
+                          <button
+                            key={i}
+                            onClick={() => {
+                              setConfig({...config, geoidUndulation: zone.undulation});
+                              showNotification(`Ondulación aplicada: ${zone.undulation}m (${zone.region})`, 'success');
+                            }}
+                            className="text-left p-3 bg-slate-800 hover:bg-slate-700 rounded-lg transition-all"
+                          >
+                            <div className="font-bold text-purple-300 mb-1">{zone.region}</div>
+                            <div className="text-xs text-slate-400">{zone.departments}</div>
+                            <div className="text-sm text-cyan-400 font-mono mt-1">
+                              N = {zone.undulation}m <span className="text-slate-500">({zone.range})</span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                      <div className="text-xs text-blue-300 font-bold mb-2">🌊 Ondulación Geoidal (N)</div>
+                      <div className="text-xs text-slate-400 mb-2">
+                        La ondulación geoidal es la separación entre el elipsoide y el geoide (nivel medio del mar). 
+                        En Perú varía entre 25-35 metros típicamente.
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <input 
+                          type="number" 
+                          step="0.001"
+                          value={config.geoidUndulation}
+                          onChange={(e) => setConfig({...config, geoidUndulation: parseFloat(e.target.value)})}
+                          className="flex-1 bg-slate-800 border border-slate-700 rounded-xl p-3 text-white font-mono text-lg"
+                          placeholder="30.000"
+                        />
+                        <span className="text-white font-bold">metros</span>
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-green-500/10 rounded-lg border border-green-500/30">
+                      <div className="text-xs text-green-300 font-bold mb-2">📐 Cálculo de Alturas</div>
+                      <div className="text-xs text-slate-300 space-y-1 font-mono">
+                        <div>1. Alt. elipsoidal GPS: {gnssData.altitude.toFixed(3)} m</div>
+                        <div>2. - Altura instrumento: {config.instrumentHeight.toFixed(3)} m</div>
+                        <div className="border-t border-green-500/30 my-1 pt-1">
+                           = Alt. elipsoidal punto: {(gnssData.altitude - config.instrumentHeight).toFixed(3)} m</div>
+                        <div>3. - Ondulación geoidal (N): {config.geoidUndulation.toFixed(3)} m</div>
+                        <div className="border-t border-green-500/30 my-1 pt-1 text-green-400 font-bold">
+                           = Alt. ortométrica (snm): {(gnssData.altitude - config.instrumentHeight - config.geoidUndulation).toFixed(3)} m ✓
+                        </div>
+                      </div>
+                    </div>
+
+                    {(config.geoidModel === 'EGM08' || config.geoidModel === 'EGM08-25') && (
+                      <div className="p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
+                        <div className="text-xs text-yellow-300 font-bold mb-2">
+                          💡 {config.geoidModel === 'EGM08' ? 'EGM08 (Alta resolución)' : 'EGM08-25 (IGN Perú)'}
+                        </div>
+                        <div className="text-xs text-slate-300 space-y-1">
+                          {config.geoidModel === 'EGM08' && (
+                            <>
+                              <div>• Modelo global de alta resolución (2.5 arcmin ≈ 5km)</div>
+                              <div>• Precisión: ±10cm en áreas con datos gravimétricos</div>
+                              <div>• Mejor para trabajos de alta precisión</div>
+                            </>
+                          )}
+                          {config.geoidModel === 'EGM08-25' && (
+                            <>
+                              <div>• Modelo oficial del IGN (Instituto Geográfico Nacional)</div>
+                              <div>• Resolución: 25 km</div>
+                              <div>• Ondulación típica en Perú: 22-35 m</div>
+                            </>
+                          )}
+                          <div className="mt-2 space-y-1 border-t border-yellow-500/30 pt-2">
+                            <div className="font-bold text-cyan-400">Valores por región:</div>
+                            <div>• Costa: ~28-31m</div>
+                            <div>• Sierra: ~22-28m</div>
+                            <div>• Selva: ~30-35m</div>
+                          </div>
+                          <div className="mt-2 p-2 bg-slate-800/50 rounded">
+                            <span className="font-bold text-green-400">📍 Recomendación:</span> Usa el selector rápido arriba 
+                            para obtener el valor aproximado de tu zona, o consulta las cartas geoidales oficiales del IGN 
+                            para mayor precisión.
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-slate-900/50 p-4 rounded-xl">
+                <label className="text-slate-400 text-sm mb-2 block flex items-center gap-2">
+                  <Activity className="w-4 h-4" />
+                  Altura del Instrumento (bastón/antena)
+                </label>
+                <div className="flex items-center gap-3">
+                  <input 
+                    type="number" 
+                    step="0.001"
+                    value={config.instrumentHeight}
+                    onChange={(e) => setConfig({...config, instrumentHeight: parseFloat(e.target.value)})}
+                    className="flex-1 bg-slate-800 border border-slate-700 rounded-xl p-3 text-white font-mono text-lg"
+                    placeholder="1.500"
+                  />
+                  <span className="text-white font-bold text-lg">metros</span>
+                </div>
+                <div className="text-xs text-slate-500 mt-2">
+                  📏 Mide desde el punto en el suelo hasta el centro de fase de la antena. Esta altura se restará de la altitud elipsoidal para obtener la altura del punto.
+                </div>
+                <div className="mt-3 p-3 bg-blue-500/10 rounded-lg">
+                  <div className="text-xs text-blue-300">
+                    <span className="font-bold">Ejemplo:</span> Si tu bastón mide 1.500m y la altitud GPS es 234.567m, 
+                    la altura del punto será: <span className="font-mono text-green-400">234.567 - 1.500 = 233.067m</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-slate-900/50 p-4 rounded-xl">
+                <label className="text-slate-400 text-sm mb-2 block flex items-center gap-2">
+                  <Globe className="w-4 h-4" />
+                  Elipsoide de Referencia
+                </label>
+                <select 
+                  value={config.ellipsoid}
+                  onChange={(e) => {
+                    setConfig({...config, ellipsoid: e.target.value});
+                    showNotification('Elipsoide cambiado: ' + e.target.value, 'success');
+                  }}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white"
+                >
+                  {ellipsoids.map(ell => (
+                    <option key={ell.value} value={ell.value}>{ell.name}</option>
+                  ))}
+                </select>
+                <div className="mt-3 text-xs text-slate-400 space-y-1">
+                  <div className="font-bold text-slate-300">ℹ️ Información del elipsoide seleccionado:</div>
+                  {ellipsoids.filter(e => e.value === config.ellipsoid).map(ell => (
+                    <div key={ell.value} className="ml-4 space-y-1 font-mono bg-slate-800/50 p-2 rounded">
+                      <div>Semieje mayor (a): <span className="text-cyan-400">{ell.semiMajor.toFixed(3)} m</span></div>
+                      <div>Semieje menor (b): <span className="text-cyan-400">{ell.semiMinor.toFixed(5)} m</span></div>
+                      <div>Aplanamiento: <span className="text-cyan-400">1/{ell.flattening.toFixed(9)}</span></div>
+                      {ell.official && (
+                        <div className="text-green-400 font-bold mt-2">✓ Oficial IGN Perú</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
+                  <div className="text-xs text-yellow-300">
+                    <span className="font-bold">💡 Para Perú:</span> El IGN recomienda usar <span className="font-bold">WGS84-IGN</span> con los parámetros 
+                    oficiales (semieje menor: 6 356 752,31424 m). También es compatible <span className="font-bold">SIRGAS2000</span> para trabajos regionales en Sudamérica.
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-slate-900/50 p-4 rounded-xl">
+                <h3 className="font-bold mb-3 flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-purple-400" />
+                  Comandos IMU & TILT
+                </h3>
+                <div className="grid grid-cols-2 gap-2">
+                  {k922Commands.imu.map((cmd, i) => (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        addTerminalLog(`Enviando: ${cmd.cmd}`, 'info');
+                        if (cmd.cmd.includes('ENABLE')) {
+                          setImuData({...imuData, tiltCompensation: true});
+                          showNotification('TILT activado en K922', 'success');
+                          addTerminalLog('TILT compensation enabled', 'success');
+                        } else if (cmd.cmd.includes('DISABLE')) {
+                          setImuData({...imuData, tiltCompensation: false});
+                          showNotification('TILT desactivado en K922', 'warning');
+                          addTerminalLog('TILT compensation disabled', 'warning');
+                        } else if (cmd.cmd.includes('IMUCALIBRATE')) {
+                          showNotification('Calibrando IMU... mantén quieto 30s', 'info');
+                          setTimeout(() => {
+                            setImuData({...imuData, imuCalibrated: true});
+                            showNotification('IMU calibrado correctamente', 'success');
+                            addTerminalLog('IMU calibration completed', 'success');
+                          }, 3000);
+                        }
+                      }}
+                      className="bg-slate-800 hover:bg-slate-700 p-3 rounded-lg text-sm text-left"
+                    >
+                      <div className="font-bold text-purple-400">{cmd.name}</div>
+                      <div className="text-xs text-slate-500 mt-1 font-mono">{cmd.cmd}</div>
+                      <div className="text-xs text-slate-600 mt-1">{cmd.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-slate-900/50 p-4 rounded-xl">
+                <h3 className="font-bold mb-3 flex items-center gap-2">
+                  <Target className="w-5 h-5 text-green-400" />
+                  Comandos Posicionamiento
+                </h3>
+                <div className="grid grid-cols-2 gap-2">
+                  {k922Commands.positioning.map((cmd, i) => (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        addTerminalLog(`Enviando: ${cmd.cmd}`, 'info');
+                        if (cmd.cmd.includes('SAVECONFIG')) {
+                          showNotification('Configuración guardada en K922', 'success');
+                          addTerminalLog('Configuration saved to flash memory', 'success');
+                        }
+                      }}
+                      className="bg-slate-800 hover:bg-slate-700 p-3 rounded-lg text-sm text-left"
+                    >
+                      <div className="font-bold text-green-400">{cmd.name}</div>
+                      <div className="text-xs text-slate-500 mt-1 font-mono">{cmd.cmd}</div>
+                      <div className="text-xs text-slate-600 mt-1">{cmd.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-slate-900/50 p-4 rounded-xl">
+                <h3 className="font-bold mb-3 flex items-center gap-2">
+                  <Download className="w-5 h-5 text-blue-400" />
+                  Comandos Salida de Datos
+                </h3>
+                <div className="grid grid-cols-2 gap-2">
+                  {k922Commands.output.map((cmd, i) => (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        addTerminalLog(`Enviando: ${cmd.cmd}`, 'info');
+                        showNotification('Formato de salida configurado', 'success');
+                      }}
+                      className="bg-slate-800 hover:bg-slate-700 p-3 rounded-lg text-sm text-left"
+                    >
+                      <div className="font-bold text-blue-400">{cmd.name}</div>
+                      <div className="text-xs text-slate-500 mt-1 font-mono">{cmd.cmd}</div>
+                      <div className="text-xs text-slate-600 mt-1">{cmd.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-slate-900/50 p-4 rounded-xl">
+                <h3 className="font-bold mb-3 flex items-center gap-2">
+                  <Satellite className="w-5 h-5 text-cyan-400" />
+                  Comandos Constelaciones GNSS
+                </h3>
+                <div className="grid grid-cols-2 gap-2">
+                  {k922Commands.gnss.map((cmd, i) => (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        addTerminalLog(`Enviando: ${cmd.cmd}`, 'info');
+                        showNotification('Comando GNSS enviado', 'success');
+                        if (cmd.cmd.includes('GALILEO')) {
+                          addTerminalLog('Galileo constellation enabled', 'success');
+                        }
+                      }}
+                      className="bg-slate-800 hover:bg-slate-700 p-3 rounded-lg text-sm text-left"
+                    >
+                      <div className="font-bold text-cyan-400">{cmd.name}</div>
+                      <div className="text-xs text-slate-500 mt-1 font-mono">{cmd.cmd}</div>
+                      <div className="text-xs text-slate-600 mt-1">{cmd.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <CheckCircle className="w-5 h-5 text-green-400 mt-1" />
+                  <div>
+                    <div className="font-bold text-green-400 mb-1">Estado de configuración</div>
+                    <div className="space-y-1 text-sm text-slate-300">
+                      <div>• TILT: <span className={imuData.tiltCompensation ? 'text-green-400' : 'text-red-400'}>
+                        {imuData.tiltCompensation ? 'ACTIVADO ✓' : 'DESACTIVADO ✗'}
+                      </span></div>
+                      <div>• IMU: <span className={imuData.imuCalibrated ? 'text-green-400' : 'text-yellow-400'}>
+                        {imuData.imuCalibrated ? 'CALIBRADO ✓' : 'Sin calibrar'}
+                      </span></div>
+                      <div>• Fusión: <span className="text-blue-400">{imuData.fusionMode}</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeSection === 'ppp' && (
+          <div className="bg-slate-800/90 backdrop-blur-xl rounded-2xl p-5 border border-slate-700">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <Globe className="w-7 h-7 text-cyan-400" />
+                PPP (Precise Point Positioning)
+              </h2>
+              <button 
+                onClick={() => {
+                  setPppData({...pppData, enabled: !pppData.enabled, convergenceTime: 0, converged: false});
+                  showNotification('PPP ' + (!pppData.enabled ? 'activado' : 'desactivado'), 'success');
+                  addTerminalLog(`PPP ${!pppData.enabled ? 'enabled' : 'disabled'}`, 'info');
+                }}
+                className={'px-4 py-2 rounded-lg font-bold ' + (pppData.enabled ? 'bg-green-500' : 'bg-slate-600')}
+              >
+                {pppData.enabled ? '✓ ACTIVO' : 'INACTIVO'}
+              </button>
+            </div>
+
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 mb-4">
+              <div className="text-sm text-blue-300 mb-2">ℹ️ ¿Qué es PPP?</div>
+              <div className="text-xs text-slate-400">
+                PPP utiliza correcciones satelitales precisas para lograr precisión decim étrica sin estación base local.
+                Requiere ~20 minutos para convergencia completa. Ideal para áreas sin cobertura NTRIP.
+              </div>
+            </div>
+
+            {pppData.enabled && (
+              <div className="space-y-4">
+                <div className="bg-slate-900/50 p-5 rounded-xl">
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-slate-400">Estado de convergencia</span>
+                    <span className={'font-bold ' + (pppData.converged ? 'text-green-400' : 'text-yellow-400')}>
+                      {pppData.converged ? 'CONVERGIDO ✓' : 'CONVERGIENDO...'}
+                    </span>
+                  </div>
+
+                  <div className="relative">
+                    <div className="h-4 bg-slate-800 rounded-full overflow-hidden">
+                      <div 
+                        className={'h-full transition-all ' + (pppData.converged ? 'bg-green-500' : 'bg-yellow-500')}
+                        style={{width: `${(pppData.convergenceTime / pppData.targetTime) * 100}%`}}
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs text-slate-500 mt-1">
+                      <span>0 min</span>
+                      <span>10 min</span>
+                      <span>20 min</span>
+                    </div>
+                  </div>
+
+                  <div className="text-center mt-4">
+                    <div className="text-4xl font-bold text-cyan-400">
+                      {Math.floor(pppData.convergenceTime / 60)}:{(pppData.convergenceTime % 60).toString().padStart(2, '0')}
+                    </div>
+                    <div className="text-sm text-slate-400 mt-1">
+                      Tiempo transcurrido / {Math.floor(pppData.targetTime / 60)} min objetivo
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-slate-900/50 p-4 rounded-xl">
+                    <div className="text-slate-400 text-sm mb-2">Precisión actual</div>
+                    <div className="text-2xl font-bold">
+                      {pppData.converged ? '±0.10m' : `±${(0.5 - (pppData.convergenceTime / pppData.targetTime) * 0.4).toFixed(2)}m`}
+                    </div>
+                  </div>
+                  <div className="bg-slate-900/50 p-4 rounded-xl">
+                    <div className="text-slate-400 text-sm mb-2">Satélites PPP</div>
+                    <div className="text-2xl font-bold text-cyan-400">
+                      {gnssData.satellites}
+                    </div>
+                  </div>
+                </div>
+
+                {pppData.converged && (
+                  <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
+                    <div className="flex items-center gap-2 text-green-400 mb-2">
+                      <CheckCircle className="w-5 h-5" />
+                      <span className="font-bold">PPP Convergido</span>
+                    </div>
+                    <div className="text-sm text-slate-300">
+                      Precisión alcanzada: Horizontal ±10cm, Vertical ±20cm. Ya puedes guardar puntos con alta precisión.
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!pppData.enabled && (
+              <div className="text-center py-16 text-slate-400">
+                <Globe className="w-20 h-20 mx-auto mb-5 opacity-30" />
+                <p className="text-lg font-semibold">PPP desactivado</p>
+                <p className="text-sm mt-2 text-slate-500">Activa PPP para posicionamiento de precisión sin estación base</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeSection === 'ethernet' && (
+          <div className="bg-slate-800/90 backdrop-blur-xl rounded-2xl p-5 border border-slate-700">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <Wifi className="w-7 h-7 text-green-400" />
+                Configuración Ethernet
+              </h2>
+              <button 
+                onClick={() => {
+                  setEthernetConfig({...ethernetConfig, enabled: !ethernetConfig.enabled});
+                  showNotification('Ethernet ' + (!ethernetConfig.enabled ? 'activado' : 'desactivado'), 'success');
+                  addTerminalLog(`Ethernet ${!ethernetConfig.enabled ? 'enabled' : 'disabled'}`, 'info');
+                }}
+                className={'px-4 py-2 rounded-lg font-bold ' + (ethernetConfig.enabled ? 'bg-green-500' : 'bg-slate-600')}
+              >
+                {ethernetConfig.enabled ? '✓ CONECTADO' : 'DESCONECTADO'}
+              </button>
+            </div>
+
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 mb-4">
+              <div className="text-sm text-blue-300 mb-2">ℹ️ Ethernet en K922 - ¿Para qué sirve?</div>
+              <div className="text-xs text-slate-400 space-y-2">
+                <div>El K922 tiene interfaz Ethernet (pines 12, 13, 25, 26) que permite:</div>
+                <div className="ml-4 space-y-1">
+                  <div>• 📡 <span className="text-green-400">Recibir correcciones NTRIP por cable</span> (más estable que WiFi/4G)</div>
+                  <div>• 🌐 <span className="text-blue-400">Streaming de datos GNSS</span> a computadora/servidor en red local</div>
+                  <div>• 🚜 <span className="text-yellow-400">Integración en vehículos</span> con red cableada (tractores, maquinaria)</div>
+                  <div>• 💻 <span className="text-purple-400">Post-procesamiento en tiempo real</span> enviando datos a software</div>
+                  <div>• 📊 <span className="text-cyan-400">Monitoreo remoto</span> de múltiples receptores en una red</div>
+                </div>
+                <div className="mt-2 p-2 bg-yellow-500/10 rounded border border-yellow-500/30">
+                  <span className="text-yellow-300 font-bold">⚠️ Requisito hardware:</span> Necesitas un transformador Ethernet externo (PHY tipo voltage). 
+                  El K922 solo tiene las señales digitales TD+/TD-/RD+/RD- (voltaje diferencial). 
+                  El transformador convierte estas señales al estándar Ethernet RJ45.
+                </div>
+                <div className="mt-2 text-green-300">
+                  ✅ <span className="font-bold">Ventaja principal:</span> Latencia ultra-baja (&lt;1ms) ideal para aplicaciones en tiempo real como control de maquinaria autónoma.
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="bg-slate-900/50 p-4 rounded-xl">
+                <label className="text-slate-400 text-sm mb-2 block">Dirección IP</label>
+                <input 
+                  type="text" 
+                  value={ethernetConfig.ipAddress}
+                  onChange={(e) => setEthernetConfig({...ethernetConfig, ipAddress: e.target.value})}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white font-mono"
+                  placeholder="192.168.1.100"
+                />
+              </div>
+
+              <div className="bg-slate-900/50 p-4 rounded-xl">
+                <label className="text-slate-400 text-sm mb-2 block">Máscara de red</label>
+                <input 
+                  type="text" 
+                  value={ethernetConfig.netmask}
+                  onChange={(e) => setEthernetConfig({...ethernetConfig, netmask: e.target.value})}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white font-mono"
+                  placeholder="255.255.255.0"
+                />
+              </div>
+
+              <div className="bg-slate-900/50 p-4 rounded-xl">
+                <label className="text-slate-400 text-sm mb-2 block">Gateway</label>
+                <input 
+                  type="text" 
+                  value={ethernetConfig.gateway}
+                  onChange={(e) => setEthernetConfig({...ethernetConfig, gateway: e.target.value})}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white font-mono"
+                  placeholder="192.168.1.1"
+                />
+              </div>
+
+              <div className="bg-slate-900/50 p-4 rounded-xl">
+                <label className="text-slate-400 text-sm mb-2 block">Puerto TCP</label>
+                <input 
+                  type="number" 
+                  value={ethernetConfig.port}
+                  onChange={(e) => setEthernetConfig({...ethernetConfig, port: parseInt(e.target.value)})}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white font-mono"
+                  placeholder="8888"
+                />
+              </div>
+
+              <button 
+                onClick={() => {
+                  showNotification('Configuración Ethernet aplicada', 'success');
+                  addTerminalLog(`Ethernet configured: ${ethernetConfig.ipAddress}:${ethernetConfig.port}`, 'success');
+                  addTerminalLog(`Sending: IPCONFIG STATIC ${ethernetConfig.ipAddress} ${ethernetConfig.netmask} ${ethernetConfig.gateway}`, 'info');
+                }}
+                className="w-full bg-blue-500 hover:bg-blue-600 py-4 rounded-xl font-bold flex items-center justify-center gap-2"
+              >
+                <CheckCircle className="w-5 h-5" />
+                Aplicar Configuración
+              </button>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button 
+                  onClick={() => {
+                    addTerminalLog('Sending: IPCONFIG AUTO', 'info');
+                    showNotification('DHCP activado - IP automática', 'success');
+                    addTerminalLog('DHCP client started', 'success');
+                  }}
+                  className="bg-green-600 hover:bg-green-700 py-3 rounded-xl font-bold"
+                >
+                  DHCP Auto
+                </button>
+                <button 
+                  onClick={() => {
+                    addTerminalLog('Sending: LOG ETHSTATUS ONCE', 'info');
+                    addTerminalLog(`IP: ${ethernetConfig.ipAddress}, MAC: 00:11:22:33:44:55`, 'success');
+                    showNotification('Estado Ethernet mostrado en terminal', 'info');
+                  }}
+                  className="bg-purple-600 hover:bg-purple-700 py-3 rounded-xl font-bold"
+                >
+                  Ver Estado
+                </button>
+              </div>
+
+              {ethernetConfig.enabled && (
+                <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
+                  <div className="flex items-center gap-2 text-green-400 mb-2">
+                    <CheckCircle className="w-4 h-4" />
+                    <span className="font-bold">Ethernet activo</span>
+                  </div>
+                  <div className="text-sm text-slate-300 space-y-1 font-mono">
+                    <div>IP: {ethernetConfig.ipAddress}</div>
+                    <div>Puerto: {ethernetConfig.port}</div>
+                    <div>Estado: Conectado</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeSection === 'status' && (
+          <div className="bg-slate-800/90 backdrop-blur-xl rounded-2xl p-5 border border-slate-700">
+            <h2 className="text-xl font-bold mb-5 flex items-center gap-2">
+              <Activity className="w-7 h-7 text-green-400" />
+              Estado General
+            </h2>
+            
+            <div className="space-y-4">
+              <div className="bg-slate-900/50 p-4 rounded-xl">
+                <div className="text-slate-400 text-sm mb-2">Relación señal/ruido</div>
+                <div className="grid grid-cols-4 gap-2 mt-3">
+                  {satelliteData.slice(0, 16).map(sat => (
+                    <div key={sat.id} className="text-center">
+                      <div className="text-xs text-slate-500 mb-1">{sat.id}</div>
+                      <div className={'h-16 rounded ' + (sat.snr > 35 ? 'bg-green-500' : sat.snr > 25 ? 'bg-yellow-500' : 'bg-red-500')} 
+                           style={{height: `${sat.snr}px`}}>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-slate-900/50 p-4 rounded-xl">
+                  <div className="text-slate-400 text-sm">Satélites visibles</div>
+                  <div className="text-3xl font-bold text-blue-400">{gnssData.satellites}</div>
+                </div>
+                <div className="bg-slate-900/50 p-4 rounded-xl">
+                  <div className="text-slate-400 text-sm">PDOP</div>
+                  <div className="text-3xl font-bold text-green-400">{gnssData.pdop.toFixed(1)}</div>
+                </div>
+                <div className="bg-slate-900/50 p-4 rounded-xl">
+                  <div className="text-slate-400 text-sm">Solución</div>
+                  <div className={'text-2xl font-bold ' + getFixColor(gnssData.fixType)}>{gnssData.fixType}</div>
+                </div>
+                <div className="bg-slate-900/50 p-4 rounded-xl">
+                  <div className="text-slate-400 text-sm">Modo posicionamiento</div>
+                  <div className="text-xl font-bold text-purple-400">Cinemático</div>
+                </div>
+              </div>
+
+              <div className="bg-slate-900/50 p-4 rounded-xl">
+                <div className="text-slate-400 text-sm mb-3">Coordenadas y precisión</div>
+                <div className="space-y-2 font-mono text-sm">
+                  <div className="flex justify-between">
+                    <span>{gnssData.latitude.toFixed(8)}° E</span>
+                    <span className="text-slate-500">σE 0.004 m</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>{gnssData.longitude.toFixed(8)}° N</span>
+                    <span className="text-slate-500">σN 0.004 m</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>{gnssData.altitude.toFixed(3)} m</span>
+                    <span className="text-slate-500">σU 0.009 m</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeSection === 'mode' && (
+          <div className="bg-slate-800/90 backdrop-blur-xl rounded-2xl p-5 border border-slate-700">
+            <h2 className="text-xl font-bold mb-5 flex items-center gap-2">
+              <Settings className="w-7 h-7 text-blue-400" />
+              Modo de Operación GNSS
+            </h2>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-slate-400 text-sm mb-2 block">Modo</label>
+                <select 
+                  value={mode} 
+                  onChange={(e) => {
+                    setMode(e.target.value);
+                    showNotification('Modo cambiado a: ' + e.target.value, 'success');
+                    addTerminalLog(`Modo GNSS: ${e.target.value}`, 'info');
+                  }}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl p-4 text-white"
+                >
+                  <option value="ppp">PPP (Precise Point Positioning)</option>
+                  <option value="rover">Rover</option>
+                  <option value="average-base">Average Base</option>
+                  <option value="known-base">Known Base</option>
+                </select>
+              </div>
+
+              {mode === 'rover' && (
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
+                  <h3 className="font-bold mb-3">Configuración Rover</h3>
+                  <div>
+                    <label className="text-slate-400 text-sm mb-2 block">Frecuencia de actualización</label>
+                    <select className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white">
+                      <option value="1">1 Hz</option>
+                      <option value="5">5 Hz</option>
+                      <option value="10">10 Hz</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {mode === 'average-base' && (
+                <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
+                  <h3 className="font-bold mb-3">Configuración Average Base</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-slate-400 text-sm mb-2 block">Tiempo mínimo</label>
+                      <input 
+                        type="number" 
+                        defaultValue="60"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white"
+                        placeholder="segundos"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-slate-400 text-sm mb-2 block">Precisión mínima</label>
+                      <input 
+                        type="number" 
+                        defaultValue="1"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white"
+                        placeholder="metros"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {mode === 'known-base' && (
+                <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-4">
+                  <h3 className="font-bold mb-3">Configuración Known Base</h3>
+                  <div className="space-y-3">
+                    <input 
+                      type="text" 
+                      placeholder="Latitud"
+                      value={knownBaseConfig.latitude}
+                      onChange={(e) => setKnownBaseConfig({...knownBaseConfig, latitude: e.target.value})}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white"
+                    />
+                    <input 
+                      type="text" 
+                      placeholder="Longitud"
+                      value={knownBaseConfig.longitude}
+                      onChange={(e) => setKnownBaseConfig({...knownBaseConfig, longitude: e.target.value})}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white"
+                    />
+                    <input 
+                      type="text" 
+                      placeholder="Elevación"
+                      value={knownBaseConfig.elevation}
+                      onChange={(e) => setKnownBaseConfig({...knownBaseConfig, elevation: e.target.value})}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white"
+                    />
+                    <div>
+                      <label className="text-slate-400 text-sm mb-2 block">Precisión mínima</label>
+                      <input 
+                        type="number" 
+                        value={knownBaseConfig.minAccuracy}
+                        onChange={(e) => setKnownBaseConfig({...knownBaseConfig, minAccuracy: e.target.value})}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white"
+                        placeholder="metros"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <button 
+                onClick={() => {
+                  showNotification('Configuración aplicada', 'success');
+                  addTerminalLog(`Configuración aplicada para modo: ${mode}`, 'success');
+                }}
+                className="w-full bg-blue-500 hover:bg-blue-600 py-4 rounded-xl font-bold flex items-center justify-center gap-2"
+              >
+                <CheckCircle className="w-5 h-5" />
+                Aplicar Configuración
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeSection === 'ntrip' && (
+          <div className="bg-slate-800/90 backdrop-blur-xl rounded-2xl p-5 border border-slate-700">
+            <h2 className="text-xl font-bold mb-5 flex items-center gap-2">
+              <Radio className="w-7 h-7 text-blue-400" />
+              Configuración NTRIP
+            </h2>
+
+            <div className="space-y-4">
+              <div className="bg-slate-900/50 p-4 rounded-xl">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-bold">NTRIP Server</h3>
+                  <div className={'px-3 py-1 rounded-full text-xs font-bold ' + (ntripConnected ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400')}>
+                    {ntripConnected ? 'Conectado' : 'Desconectado'}
+                  </div>
+                </div>
+                
+                <div className="space-y-3">
+                  <div className="flex gap-3">
+                    <input 
+                      type="text" 
+                      placeholder="Host"
+                      value={ntripConfig.serverHost}
+                      onChange={(e) => setNtripConfig({...ntripConfig, serverHost: e.target.value})}
+                      className="flex-1 bg-slate-800 border border-slate-700 rounded-xl p-3 text-white"
+                    />
+                    <input 
+                      type="text" 
+                      placeholder="Puerto"
+                      value={ntripConfig.serverPort}
+                      onChange={(e) => setNtripConfig({...ntripConfig, serverPort: e.target.value})}
+                      className="w-24 bg-slate-800 border border-slate-700 rounded-xl p-3 text-white"
+                    />
+                  </div>
+                  <input 
+                    type="text" 
+                    placeholder="Mountpoint"
+                    value={ntripConfig.mountpoint}
+                    onChange={(e) => setNtripConfig({...ntripConfig, mountpoint: e.target.value})}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white"
+                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <input 
+                      type="text" 
+                      placeholder="Usuario (opcional)"
+                      value={ntripConfig.username}
+                      onChange={(e) => setNtripConfig({...ntripConfig, username: e.target.value})}
+                      className="bg-slate-800 border border-slate-700 rounded-xl p-3 text-white"
+                    />
+                    <input 
+                      type="password" 
+                      placeholder="Contraseña (opcional)"
+                      value={ntripConfig.password}
+                      onChange={(e) => setNtripConfig({...ntripConfig, password: e.target.value})}
+                      className="bg-slate-800 border border-slate-700 rounded-xl p-3 text-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-slate-900/50 p-4 rounded-xl">
+                <h3 className="font-bold mb-3">NTRIP Caster</h3>
+                <div className="space-y-3">
+                  <div className="flex gap-3">
+                    <input 
+                      type="text" 
+                      placeholder="Puerto"
+                      value={ntripConfig.casterPort}
+                      onChange={(e) => setNtripConfig({...ntripConfig, casterPort: e.target.value})}
+                      className="flex-1 bg-slate-800 border border-slate-700 rounded-xl p-3 text-white"
+                    />
+                    <input 
+                      type="text" 
+                      placeholder="Mountpoint"
+                      value={ntripConfig.mountpoint}
+                      className="flex-1 bg-slate-800 border border-slate-700 rounded-xl p-3 text-white"
+                      disabled
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <button 
+                onClick={() => {
+                  if (ntripConnected) {
+                    disconnectNTRIP();
+                  } else {
+                    connectNTRIP();
+                  }
+                }}
+                className={'w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 ' + (
+                  ntripConnected ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'
+                )}
+              >
+                <Radio className="w-5 h-5" />
+                {ntripConnected ? 'Desconectar NTRIP' : 'Conectar NTRIP'}
+              </button>
+
+              {ntripConnected && (
+                <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4 text-sm">
+                  <div className="flex items-center gap-2 text-green-400 mb-2">
+                    <CheckCircle className="w-4 h-4" />
+                    <span className="font-bold">Conexión activa</span>
+                  </div>
+                  <div className="text-slate-300 space-y-1 font-mono text-xs">
+                    <div>Server: {ntripConfig.serverHost}:{ntripConfig.serverPort}</div>
+                    <div>Mountpoint: {ntripConfig.mountpoint}</div>
+                    <div>Estado: Recibiendo correcciones RTK</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeSection === 'lora' && (
+          <div className="bg-slate-800/90 backdrop-blur-xl rounded-2xl p-5 border border-slate-700">
+            <h2 className="text-xl font-bold mb-5 flex items-center gap-2">
+              <Radio className="w-7 h-7 text-purple-400" />
+              Configuración LoRa
+            </h2>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between bg-slate-900/50 p-4 rounded-xl">
+                <span className="font-bold">Estado LoRa</span>
+                <div className={'px-3 py-1 rounded-full text-xs font-bold ' + (loraConnected ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400')}>
+                  {loraConnected ? 'Conectado' : 'Desconectado'}
+                </div>
+              </div>
+
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
+                <div className="text-sm text-blue-300 mb-2">ℹ️ Frecuencias LoRa soportadas</div>
+                <div className="text-xs text-slate-400">
+                  El GNSS.AI puede trabajar en múltiples bandas LoRa: <span className="font-bold text-green-400">433MHz, 470MHz, 868MHz, 915MHz</span>. 
+                  Selecciona según tu región: América (915MHz), Europa (868MHz), Asia (470MHz).
+                </div>
+              </div>
+
+              <div className="bg-slate-900/50 p-4 rounded-xl">
+                <label className="text-slate-400 text-sm mb-2 block">Frecuencia LoRa</label>
+                <select 
+                  value={loraConfig.frequency}
+                  onChange={(e) => setLoraConfig({...loraConfig, frequency: parseInt(e.target.value)})}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white"
+                >
+                  <option value="433">433 MHz (Universal)</option>
+                  <option value="470">470 MHz (China)</option>
+                  <option value="868">868 MHz (Europa)</option>
+                  <option value="915">915 MHz (América)</option>
+                </select>
+                <div className="text-xs text-slate-500 mt-2">
+                  {loraConfig.frequency === 433 && '🌍 Banda ISM global - compatible en mayoría de países'}
+                  {loraConfig.frequency === 470 && '🇨🇳 Banda específica de China'}
+                  {loraConfig.frequency === 868 && '🇪🇺 Banda Europa (863-870 MHz)'}
+                  {loraConfig.frequency === 915 && '🇺🇸 Banda América (902-928 MHz)'}
+                </div>
+              </div>
+
+              <div className="bg-slate-900/50 p-4 rounded-xl">
+                <label className="text-slate-400 text-sm mb-2 block">Canal de Radio</label>
+                <select 
+                  value={loraConfig.channel}
+                  onChange={(e) => setLoraConfig({...loraConfig, channel: parseInt(e.target.value)})}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white"
+                >
+                  {[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16].map(ch => (
+                    <option key={ch} value={ch}>Canal {ch} ({loraConfig.frequency + (ch - 1) * 0.2} MHz)</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="bg-slate-900/50 p-4 rounded-xl">
+                <label className="text-slate-400 text-sm mb-2 block">Velocidad de datos (Air Data Rate)</label>
+                <select 
+                  value={loraConfig.dataRate}
+                  onChange={(e) => setLoraConfig({...loraConfig, dataRate: e.target.value})}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white"
+                >
+                  <option value="2.4">2.4 kbps (Máximo alcance)</option>
+                  <option value="4.8">4.8 kbps (Balance)</option>
+                  <option value="9.6">9.6 kbps (Estándar)</option>
+                  <option value="19.2">19.2 kbps (Alta velocidad)</option>
+                  <option value="38.4">38.4 kbps (Muy alta velocidad)</option>
+                </select>
+                <div className="text-xs text-slate-500 mt-2">
+                  ⚡ Menor velocidad = Mayor alcance | Mayor velocidad = Menor alcance
+                </div>
+              </div>
+
+              <div className="bg-slate-900/50 p-4 rounded-xl">
+                <label className="text-slate-400 text-sm mb-3 block">Potencia de transmisión: {loraConfig.transmissionPower} dBm</label>
+                <input 
+                  type="range" 
+                  min="5" 
+                  max="30" 
+                  step="1"
+                  value={loraConfig.transmissionPower}
+                  onChange={(e) => setLoraConfig({...loraConfig, transmissionPower: parseInt(e.target.value)})}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-xs text-slate-500 mt-2">
+                  <span>5 dBm (~100m)</span>
+                  <span>17 dBm (~1km)</span>
+                  <span>30 dBm (~10km)</span>
+                </div>
+                <div className="text-xs text-yellow-400 mt-2">
+                  ⚠️ Mayor potencia = Mayor consumo de energía
+                </div>
+              </div>
+
+              <button 
+                onClick={() => {
+                  if (loraConnected) {
+                    disconnectLoRa();
+                  } else {
+                    connectLoRa();
+                  }
+                }}
+                className={'w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 ' + (
+                  loraConnected ? 'bg-red-500 hover:bg-red-600' : 'bg-purple-500 hover:bg-purple-600'
+                )}
+              >
+                <Radio className="w-5 h-5" />
+                {loraConnected ? 'Desconectar LoRa' : 'Conectar LoRa'}
+              </button>
+
+              {loraConnected && (
+                <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-4 text-sm">
+                  <div className="flex items-center gap-2 text-purple-400 mb-2">
+                    <CheckCircle className="w-4 h-4" />
+                    <span className="font-bold">LoRa activo</span>
+                  </div>
+                  <div className="text-slate-300 space-y-1 font-mono text-xs">
+                    <div>Frecuencia: {loraConfig.frequency} MHz</div>
+                    <div>Canal: {loraConfig.channel}</div>
+                    <div>Velocidad: {loraConfig.dataRate} kbps</div>
+                    <div>Potencia: {loraConfig.transmissionPower} dBm</div>
+                    <div className="text-green-400 mt-2">📡 Alcance estimado: ~{loraConfig.transmissionPower < 15 ? '500m' : loraConfig.transmissionPower < 25 ? '3km' : '10km'}</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeSection === 'photos' && (
+          <div className="bg-slate-800/90 backdrop-blur-xl rounded-2xl p-5 border border-slate-700">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <Plus className="w-7 h-7 text-pink-400" />
+                Fotogrametría
+              </h2>
+              <button 
+                onClick={() => {
+                  if (!isRecording) {
+                    showNotification('Activa la grabación primero', 'error');
+                    return;
+                  }
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.accept = 'image/*';
+                  input.capture = 'environment';
+                  input.onchange = (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = (event) => {
+                        const photo = {
+                          id: Date.now(),
+                          data: event.target.result,
+                          lat: gnssData.latitude,
+                          lon: gnssData.longitude,
+                          alt: gnssData.altitude,
+                          north: gnssData.north,
+                          east: gnssData.east,
+                          accuracy: gnssData.accuracy,
+                          fixType: gnssData.fixType,
+                          satellites: gnssData.satellites,
+                          timestamp: new Date().toISOString(),
+                          name: `Photo-${photos.length + 1}`,
+                          heading: imuData.heading,
+                          pitch: imuData.pitch,
+                          roll: imuData.roll
+                        };
+                        setPhotos([...photos, photo]);
+                        showNotification('Foto guardada con metadatos GNSS', 'success');
+                        addTerminalLog(`Photo captured: ${photo.name} at ${photo.lat.toFixed(8)}, ${photo.lon.toFixed(8)}`, 'success');
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  };
+                  input.click();
+                }}
+                className="px-5 py-3 bg-gradient-to-r from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 rounded-xl transition-all font-bold flex items-center gap-2"
+              >
+                <Plus className="w-5 h-5" />
+                Capturar Foto
+              </button>
+            </div>
+
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 mb-4">
+              <div className="text-sm text-blue-300 mb-2">ℹ️ Fotogrametría con GNSS RTK</div>
+              <div className="text-xs text-slate-400">
+                Cada foto se guarda con metadatos GNSS precisos (lat, lon, alt, precisión, orientación IMU). 
+                Compatible con software fotogramétrico: <span className="font-bold text-green-400">Pix4D, Agisoft Metashape, DroneDeploy</span>.
+                <div className="mt-2 text-yellow-300">
+                  📐 Con IMU integrado: Se guardan heading, pitch y roll para mejor reconstrucción 3D
+                </div>
+              </div>
+            </div>
+
+            {photos.length === 0 ? (
+              <div className="text-center py-16 text-slate-400">
+                <Plus className="w-20 h-20 mx-auto mb-5 opacity-30" />
+                <p className="text-lg font-semibold">No hay fotos capturadas</p>
+                <p className="text-sm mt-2 text-slate-500">Captura fotos con georeferenciación RTK para fotogrametría</p>
+              </div>
+            ) : (
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <span className="text-slate-400">{photos.length} fotos georreferenciadas</span>
+                  <button
+                    onClick={() => {
+                      const csvData = photos.map(p => 
+                        `${p.name},${p.lat.toFixed(8)},${p.lon.toFixed(8)},${p.alt.toFixed(3)},${p.accuracy.toFixed(3)},${p.heading.toFixed(2)},${p.pitch.toFixed(2)},${p.roll.toFixed(2)},${p.fixType}`
+                      ).join('\n');
+                      const blob = new Blob([`Name,Latitude,Longitude,Altitude,Accuracy,Heading,Pitch,Roll,FixType\n${csvData}`], { type: 'text/csv' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `photogrammetry_${Date.now()}.csv`;
+                      a.click();
+                      showNotification('CSV exportado con metadatos GNSS', 'success');
+                    }}
+                    className="px-4 py-2 bg-green-500 hover:bg-green-600 rounded-lg flex items-center gap-2 text-sm font-bold"
+                  >
+                    <Download className="w-4 h-4" />
+                    Exportar CSV
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {photos.map((photo) => (
+                    <div key={photo.id} className="bg-slate-900/70 rounded-xl overflow-hidden border border-slate-700">
+                      <img src={photo.data} alt={photo.name} className="w-full h-48 object-cover" />
+                      <div className="p-4">
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <h3 className="font-bold text-lg">{photo.name}</h3>
+                            <p className="text-xs text-slate-500">{new Date(photo.timestamp).toLocaleString()}</p>
+                          </div>
+                          <button
+                            onClick={() => {
+                              if (confirm('¿Eliminar foto ' + photo.name + '?')) {
+                                setPhotos(photos.filter(p => p.id !== photo.id));
+                                showNotification('Foto eliminada', 'info');
+                              }
+                            }}
+                            className="text-red-400 hover:text-red-300 p-2"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </div>
+
+                        <div className="space-y-2 text-xs font-mono bg-slate-800/50 p-3 rounded-lg">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <span className="text-slate-500">Lat:</span>
+                              <span className="text-white ml-1">{photo.lat.toFixed(8)}°</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-500">Lon:</span>
+                              <span className="text-white ml-1">{photo.lon.toFixed(8)}°</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-500">Alt:</span>
+                              <span className="text-white ml-1">{photo.alt.toFixed(3)}m</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-500">±:</span>
+                              <span className="text-green-400 ml-1">{photo.accuracy.toFixed(3)}m</span>
+                            </div>
+                          </div>
+
+                          <div className="pt-2 border-t border-slate-700">
+                            <div className="text-slate-500 mb-1">Orientación IMU:</div>
+                            <div className="grid grid-cols-3 gap-2">
+                              <div>
+                                <span className="text-slate-500">H:</span>
+                                <span className="text-purple-400 ml-1">{photo.heading.toFixed(1)}°</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-500">P:</span>
+                                <span className="text-purple-400 ml-1">{photo.pitch.toFixed(1)}°</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-500">R:</span>
+                                <span className="text-purple-400 ml-1">{photo.roll.toFixed(1)}°</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="pt-2 border-t border-slate-700">
+                            <div className="flex justify-between">
+                              <span className={'font-bold ' + getFixColor(photo.fixType)}>{photo.fixType}</span>
+                              <span className="text-slate-400">{photo.satellites} sats</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeSection === 'terminal' && (
+          <div className="bg-slate-800/90 backdrop-blur-xl rounded-2xl p-5 border border-slate-700">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <Monitor className="w-7 h-7 text-green-400" />
+                Terminal
+              </h2>
+              <div className={'px-3 py-1 rounded-full text-xs font-bold ' + (deviceConnected ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400')}>
+                {deviceConnected ? 'CONECTADO' : 'DESCONECTADO'}
+              </div>
+            </div>
+
+            <div 
+              ref={terminalRef}
+              className="bg-black rounded-xl p-4 h-96 overflow-y-auto font-mono text-sm"
+            >
+              {terminalLogs.map((log, i) => (
+                <div key={i} className={'mb-1 ' + (
+                  log.type === 'success' ? 'text-green-400' :
+                  log.type === 'error' ? 'text-red-400' :
+                  log.type === 'warning' ? 'text-yellow-400' :
+                  'text-blue-300'
+                )}>
+                  <span className="text-slate-500">[{log.time}]</span> {log.message}
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 flex gap-2">
+              <input 
+                type="text" 
+                placeholder="Ingrese comando K922... (ej: CONFIG TILTCOMPENSATION ON)"
+                className="flex-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white"
+                id="terminal-input"
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    const cmd = e.target.value;
+                    if (cmd.trim()) {
+                      addTerminalLog(`Sent: ${cmd}`, 'info');
+                      addTerminalLog(`Response: Command received`, 'success');
+                      e.target.value = '';
+                    }
+                  }
+                }}
+              />
+              <button 
+                onClick={() => {
+                  const input = document.getElementById('terminal-input');
+                  const cmd = input.value;
+                  if (cmd.trim()) {
+                    addTerminalLog(`Sent: ${cmd}`, 'info');
+                    addTerminalLog(`Response: Command received`, 'success');
+                    input.value = '';
+                  }
+                }}
+                className="bg-blue-500 hover:bg-blue-600 px-6 rounded-xl font-bold"
+              >
+                Enviar
+              </button>
+            </div>
+
+            <div className="mt-4 bg-slate-900/50 p-3 rounded-xl">
+              <div className="text-sm text-slate-400 mb-2">Comandos rápidos:</div>
+              <div className="flex flex-wrap gap-2">
+                <button 
+                  onClick={() => {
+                    addTerminalLog('Sent: LOG VERSION', 'info');
+                    addTerminalLog('GNSS.AI Firmware v1.4.0', 'success');
+                  }}
+                  className="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1 rounded"
+                >
+                  VERSION
+                </button>
+                <button 
+                  onClick={() => {
+                    addTerminalLog('Sent: LOG IMUINFO', 'info');
+                    addTerminalLog('IMU: Calibrated, TILT: ON, Fusion: Active', 'success');
+                  }}
+                  className="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1 rounded"
+                >
+                  IMU INFO
+                </button>
+                <button 
+                  onClick={() => {
+                    addTerminalLog('Sent: LOG BESTPOS', 'info');
+                    addTerminalLog(`POS: ${gnssData.latitude.toFixed(8)}, ${gnssData.longitude.toFixed(8)}`, 'success');
+                  }}
+                  className="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1 rounded"
+                >
+                  POSICIÓN
+                </button>
+                <button 
+                  onClick={() => {
+                    addTerminalLog('Sent: SAVECONFIG', 'info');
+                    addTerminalLog('Configuration saved to flash', 'success');
+                    showNotification('Configuración guardada', 'success');
+                  }}
+                  className="text-xs bg-green-700 hover:bg-green-600 px-3 py-1 rounded font-bold"
+                >
+                  💾 SAVE CONFIG
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeSection === 'ppp' && (
+          <div className="bg-slate-800/90 backdrop-blur-xl rounded-2xl p-5 border border-slate-700">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <Globe className="w-7 h-7 text-cyan-400" />
+                PPP (Precise Point Positioning)
+              </h2>
+              <button 
+                onClick={() => {
+                  setPppData({...pppData, enabled: !pppData.enabled, convergenceTime: 0, converged: false});
+                  showNotification('PPP ' + (!pppData.enabled ? 'activado' : 'desactivado'), 'success');
+                  addTerminalLog(`PPP ${!pppData.enabled ? 'enabled' : 'disabled'}`, 'info');
+                }}
+                className={'px-4 py-2 rounded-lg font-bold ' + (pppData.enabled ? 'bg-green-500' : 'bg-slate-600')}
+              >
+                {pppData.enabled ? '✓ ACTIVO' : 'INACTIVO'}
+              </button>
+            </div>
+
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 mb-4">
+              <div className="text-sm text-blue-300 mb-2">ℹ️ ¿Qué es PPP?</div>
+              <div className="text-xs text-slate-400">
+                PPP utiliza correcciones satelitales precisas para lograr precisión decimétrica sin estación base local.
+                Requiere ~20 minutos para convergencia completa. 
+                <div className="mt-2 text-green-300">
+                  ✅ <span className="font-bold">Funciona con WiFi del Pi Zero 2W</span> - No necesitas cable Ethernet, 
+                  el módulo se conecta al Pi mediante WiFi para recibir correcciones PPP de internet.
+                </div>
+              </div>
+            </div>
+
+            {pppData.enabled && (
+              <div className="space-y-4">
+                <div className="bg-slate-900/50 p-5 rounded-xl">
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-slate-400">Estado de convergencia</span>
+                    <span className={'font-bold ' + (pppData.converged ? 'text-green-400' : 'text-yellow-400')}>
+                      {pppData.converged ? 'CONVERGIDO ✓' : 'CONVERGIENDO...'}
+                    </span>
+                  </div>
+
+                  <div className="relative">
+                    <div className="h-4 bg-slate-800 rounded-full overflow-hidden">
+                      <div 
+                        className={'h-full transition-all ' + (pppData.converged ? 'bg-green-500' : 'bg-yellow-500')}
+                        style={{width: `${(pppData.convergenceTime / pppData.targetTime) * 100}%`}}
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs text-slate-500 mt-1">
+                      <span>0 min</span>
+                      <span>10 min</span>
+                      <span>20 min</span>
+                    </div>
+                  </div>
+
+                  <div className="text-center mt-4">
+                    <div className="text-4xl font-bold text-cyan-400">
+                      {Math.floor(pppData.convergenceTime / 60)}:{(pppData.convergenceTime % 60).toString().padStart(2, '0')}
+                    </div>
+                    <div className="text-sm text-slate-400 mt-1">
+                      Tiempo transcurrido / {Math.floor(pppData.targetTime / 60)} min objetivo
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-slate-900/50 p-4 rounded-xl">
+                    <div className="text-slate-400 text-sm mb-2">Precisión actual</div>
+                    <div className="text-2xl font-bold">
+                      {pppData.converged ? '±0.10m' : `±${(0.5 - (pppData.convergenceTime / pppData.targetTime) * 0.4).toFixed(2)}m`}
+                    </div>
+                  </div>
+                  <div className="bg-slate-900/50 p-4 rounded-xl">
+                    <div className="text-slate-400 text-sm mb-2">Satélites PPP</div>
+                    <div className="text-2xl font-bold text-cyan-400">
+                      {gnssData.satellites}
+                    </div>
+                  </div>
+                </div>
+
+                {pppData.converged && (
+                  <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
+                    <div className="flex items-center gap-2 text-green-400 mb-2">
+                      <CheckCircle className="w-5 h-5" />
+                      <span className="font-bold">PPP Convergido</span>
+                    </div>
+                    <div className="text-sm text-slate-300">
+                      Precisión alcanzada: Horizontal ±10cm, Vertical ±20cm. Ya puedes guardar puntos con alta precisión.
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!pppData.enabled && (
+              <div className="text-center py-16 text-slate-400">
+                <Globe className="w-20 h-20 mx-auto mb-5 opacity-30" />
+                <p className="text-lg font-semibold">PPP desactivado</p>
+                <p className="text-sm mt-2 text-slate-500">Activa PPP para posicionamiento de precisión sin estación base</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeSection === 'settings' && (
+          <div className="bg-slate-800/90 backdrop-blur-xl rounded-2xl p-5 border border-slate-700">
+            <h2 className="text-xl font-bold mb-5 flex items-center gap-2">
+              <Settings className="w-7 h-7 text-slate-400" />
+              Configuración
+            </h2>
+
+            <div className="space-y-4">
+              <div className="bg-slate-900/50 p-4 rounded-xl">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <Sliders className="w-5 h-5 text-blue-400" />
+                    <span className="font-bold">Ángulo de corte</span>
+                  </div>
+                  <span className="text-slate-400">{config.cutoffAngle}°</span>
+                </div>
+                <p className="text-xs text-slate-400 mb-3">Ángulo de elevación mínimo para seguimiento de satélites</p>
+                <select 
+                  value={config.cutoffAngle}
+                  onChange={(e) => setConfig({...config, cutoffAngle: parseInt(e.target.value)})}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white"
+                >
+                  <option value="5">5°</option>
+                  <option value="10">10°</option>
+                  <option value="15">15°</option>
+                  <option value="20">20°</option>
+                  <option value="25">25°</option>
+                  <option value="30">30°</option>
+                </select>
+              </div>
+
+              <div className="bg-slate-900/50 p-4 rounded-xl">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Zap className="w-5 h-5 text-yellow-400" />
+                    <div>
+                      <div className="font-bold">Mitigación multitrayecto</div>
+                      <p className="text-xs text-slate-400">Reduce errores causados por reflexiones de señal</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setConfig({...config, multipathMitigation: !config.multipathMitigation})}
+                    className={'w-14 h-8 rounded-full transition-all ' + (config.multipathMitigation ? 'bg-blue-500' : 'bg-slate-700')}
+                  >
+                    <div className={'w-6 h-6 bg-white rounded-full transition-all ' + (config.multipathMitigation ? 'ml-7' : 'ml-1')} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-slate-900/50 p-4 rounded-xl">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Shield className="w-5 h-5 text-red-400" />
+                    <div>
+                      <div className="font-bold">Anti-Jamming</div>
+                      <p className="text-xs text-slate-400">Protege contra interferencias intencionales</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setConfig({...config, antiJamming: !config.antiJamming})}
+                    className={'w-14 h-8 rounded-full transition-all ' + (config.antiJamming ? 'bg-blue-500' : 'bg-slate-700')}
+                  >
+                    <div className={'w-6 h-6 bg-white rounded-full transition-all ' + (config.antiJamming ? 'ml-7' : 'ml-1')} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-slate-900/50 p-4 rounded-xl">
+                <label className="text-slate-400 text-sm mb-2 block">Precisión mínima para guardar puntos</label>
+                <input 
+                  type="number" 
+                  step="0.001"
+                  value={config.minAccuracy}
+                  onChange={(e) => setConfig({...config, minAccuracy: parseFloat(e.target.value)})}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white"
+                  placeholder="metros"
+                />
+              </div>
+
+              <button 
+                onClick={() => {
+                  showNotification('Configuración guardada', 'success');
+                  addTerminalLog('Configuración actualizada', 'success');
+                }}
+                className="w-full bg-blue-500 hover:bg-blue-600 py-4 rounded-xl font-bold flex items-center justify-center gap-2"
+              >
+                <CheckCircle className="w-5 h-5" />
+                Guardar Configuración
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeSection === 'projects' && (
+          <div className="bg-slate-800/90 backdrop-blur-xl rounded-2xl p-5 border border-slate-700">
+            <div className="flex justify-between items-center mb-5">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <Database className="w-7 h-7 text-blue-400" />
+                Proyectos
+              </h2>
+              <button
+                onClick={() => {
+                  const name = prompt('Nombre del proyecto:');
+                  if (name && name.trim()) createProject(name.trim());
+                }}
+                className="px-5 py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-xl transition-all font-bold flex items-center gap-2"
+              >
+                <Plus className="w-5 h-5" />
+                Nuevo Proyecto
+              </button>
+            </div>
+            
+            {projects.length === 0 ? (
+              <div className="text-center py-16 text-slate-400">
+                <Database className="w-20 h-20 mx-auto mb-5 opacity-30" />
+                <p className="text-lg font-semibold">No hay proyectos creados</p>
+                <p className="text-sm mt-2 text-slate-500">Crea tu primer proyecto para comenzar</p>
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {projects.map(project => (
+                  <div
+                    key={project.id}
+                    onClick={() => {
+                      setCurrentProject(project);
+                      showNotification('Proyecto seleccionado: ' + project.name, 'info');
+                      addTerminalLog(`Proyecto activo: ${project.name}`, 'info');
+                    }}
+                    className={'p-5 rounded-xl cursor-pointer transition-all hover:shadow-xl ' + (
+                      currentProject && currentProject.id === project.id
+                        ? 'bg-blue-500/20 border-2 border-blue-500 shadow-lg'
+                        : 'bg-slate-900/50 border-2 border-slate-700 hover:border-slate-600'
+                    )}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="font-bold text-xl mb-1">{project.name}</h3>
+                        <p className="text-sm text-slate-400 flex items-center gap-2">
+                          <Activity className="w-3 h-3" />
+                          {new Date(project.created).toLocaleDateString()}
+                        </p>
+                        <div className="flex gap-3 mt-2 text-xs text-slate-500 font-mono">
+                          <span className="bg-slate-800 px-2 py-1 rounded">{project.coordinateSystem}</span>
+                          <span className="bg-slate-800 px-2 py-1 rounded">Zona {project.zone}</span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-4xl font-bold text-blue-400">{project.pointCount}</div>
+                        <div className="text-xs text-slate-400 font-semibold">puntos</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeSection === 'points' && (
+          <div className="bg-slate-800/90 backdrop-blur-xl rounded-2xl p-5 border border-slate-700">
+            <h2 className="text-xl font-bold mb-5">Biblioteca de Puntos</h2>
+            
+            {currentProjectPoints.length === 0 ? (
+              <div className="text-center py-16 text-slate-400">
+                <MapPin className="w-20 h-20 mx-auto mb-5 opacity-30" />
+                <p className="text-lg font-semibold">No hay puntos guardados</p>
+                {!currentProject && <p className="text-sm mt-2 text-slate-500">Selecciona un proyecto primero</p>}
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-[600px] overflow-y-auto">
+                {currentProjectPoints.map((point, index) => (
+                  <div key={point.id} className="bg-slate-900/70 p-5 rounded-xl border border-slate-700">
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <span className="text-xs bg-blue-500 text-white px-2 py-1 rounded font-bold">#{index + 1}</span>
+                          <h3 className="font-bold text-xl">{point.name}</h3>
+                        </div>
+                        {point.code && (
+                          <span className="text-sm bg-blue-500/20 text-blue-400 px-3 py-1 rounded-full">
+                            {point.code}
+                          </span>
+                        )}
+                        {point.note && (
+                          <p className="text-sm text-slate-300 mt-2 italic">
+                            {point.note}
+                          </p>
+                        )}
+                        <p className="text-xs text-slate-500 mt-2 flex items-center gap-2">
+                          <Clock className="w-3 h-3" />
+                          {new Date(point.timestamp).toLocaleString()}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          if (confirm('¿Eliminar punto ' + point.name + '?')) deletePoint(point.id);
+                        }}
+                        className="text-red-400 hover:text-red-300 p-3 rounded-lg"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-sm font-mono bg-slate-800/50 p-4 rounded-lg">
+                      <div>
+                        <span className="text-slate-500 block text-xs mb-1">Norte</span>
+                        <span className="text-white font-bold">{point.north.toFixed(3)}m</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block text-xs mb-1">Este</span>
+                        <span className="text-white font-bold">{point.east.toFixed(3)}m</span>
+                      </div>
+                      <div className="col-span-2 bg-green-500/10 p-2 rounded">
+                        <span className="text-slate-500 block text-xs mb-1">Altura elipsoidal</span>
+                        <span className="text-green-400 font-bold text-lg">{point.altitude.toFixed(3)}m</span>
+                        <div className="text-xs text-slate-500 mt-1">
+                          (GPS: {point.altitudeRaw ? point.altitudeRaw.toFixed(3) : point.altitude.toFixed(3)}m - 
+                          Inst: {point.instrumentHeight ? point.instrumentHeight.toFixed(3) : '0.000'}m)
+                        </div>
+                      </div>
+                      {point.orthometricHeight && point.geoidModel !== 'NONE' && (
+                        <div className="col-span-2 bg-cyan-500/10 p-2 rounded border border-cyan-500/30">
+                          <span className="text-slate-500 block text-xs mb-1">Altura ortométrica (snm)</span>
+                          <span className="text-cyan-400 font-bold text-lg">{point.orthometricHeight.toFixed(3)}m</span>
+                          <div className="text-xs text-slate-500 mt-1">
+                            (Geoide: {point.geoidModel}, N = {point.geoidUndulation ? point.geoidUndulation.toFixed(3) : '0.000'}m)
+                          </div>
+                        </div>
+                      )}
+                      <div>
+                        <span className="text-slate-500 block text-xs mb-1">Precisión</span>
+                        <span className="text-green-400 font-bold">±{point.accuracy.toFixed(3)}m</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block text-xs mb-1">Elipsoide</span>
+                        <span className="text-cyan-400 font-bold">{point.ellipsoid || 'WGS84'}</span>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between">
+                      <div className={'text-sm font-semibold ' + getFixColor(point.fixType) + ' flex items-center gap-2'}>
+                        <CheckCircle className="w-4 h-4" />
+                        {point.fixType}
+                      </div>
+                      <div className="text-sm text-slate-400 flex items-center gap-2">
+                        <Satellite className="w-4 h-4" />
+                        {point.satellites} satélites
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeSection === 'skyplot' && (
+          <div className="bg-slate-800/90 backdrop-blur-xl rounded-2xl p-5 border border-slate-700">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <Satellite className="w-7 h-7 text-cyan-400" />
+                Skyplot
+              </h2>
+              <button 
+                onClick={generateSatelliteData}
+                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg flex items-center gap-2"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Actualizar
+              </button>
+            </div>
+            
+            <canvas 
+              ref={canvasRef} 
+              width={600} 
+              height={600} 
+              className="w-full max-w-2xl mx-auto bg-slate-950 rounded-2xl border-2 border-slate-700"
+            />
+
+            <div className="mt-5 grid grid-cols-2 md:grid-cols-5 gap-3">
+              {[
+                { name: 'GPS', count: gnssData.gps, color: 'bg-blue-500' },
+                { name: 'GLONASS', count: gnssData.glonass, color: 'bg-red-500' },
+                { name: 'Galileo', count: gnssData.galileo, color: 'bg-green-500' },
+                { name: 'BeiDou', count: gnssData.beidou, color: 'bg-yellow-500' },
+                { name: 'QZSS', count: gnssData.qzss, color: 'bg-purple-500' }
+              ].map(item => (
+                <div key={item.name} className="flex items-center gap-3 bg-slate-900/50 p-3 rounded-xl">
+                  <div className={'w-5 h-5 rounded-full ' + item.color}></div>
+                  <div>
+                    <div className="text-xs text-slate-400">{item.name}</div>
+                    <div className="font-bold">{item.count}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeSection === 'snr' && (
+          <div className="bg-slate-800/90 backdrop-blur-xl rounded-2xl p-5 border border-slate-700">
+            <h2 className="text-xl font-bold mb-5 flex items-center gap-2">
+              <BarChart3 className="w-7 h-7 text-green-400" />
+              Historial SNR
+            </h2>
+            
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={snrHistory}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis dataKey="time" stroke="#94a3b8" />
+                <YAxis stroke="#94a3b8" />
+                <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569' }} />
+                <Legend />
+                <Line type="monotone" dataKey="gps" stroke="#3b82f6" strokeWidth={2} name="GPS" />
+                <Line type="monotone" dataKey="glonass" stroke="#ef4444" strokeWidth={2} name="GLONASS" />
+                <Line type="monotone" dataKey="galileo" stroke="#10b981" strokeWidth={2} name="Galileo" />
+                <Line type="monotone" dataKey="beidou" stroke="#f59e0b" strokeWidth={2} name="BeiDou" />
+              </LineChart>
+            </ResponsiveContainer>
+
+            <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="bg-blue-500/10 border border-blue-500/30 p-3 rounded-xl">
+                <div className="text-xs text-slate-400">GPS promedio</div>
+                <div className="text-2xl font-bold text-blue-400">
+                  {snrHistory.length > 0 ? (snrHistory[snrHistory.length - 1].gps).toFixed(1) : '0'} dB
+                </div>
+              </div>
+              <div className="bg-red-500/10 border border-red-500/30 p-3 rounded-xl">
+                <div className="text-xs text-slate-400">GLONASS promedio</div>
+                <div className="text-2xl font-bold text-red-400">
+                  {snrHistory.length > 0 ? (snrHistory[snrHistory.length - 1].glonass).toFixed(1) : '0'} dB
+                </div>
+              </div>
+              <div className="bg-green-500/10 border border-green-500/30 p-3 rounded-xl">
+                <div className="text-xs text-slate-400">Galileo promedio</div>
+                <div className="text-2xl font-bold text-green-400">
+                  {snrHistory.length > 0 ? (snrHistory[snrHistory.length - 1].galileo).toFixed(1) : '0'} dB
+                </div>
+              </div>
+              <div className="bg-yellow-500/10 border border-yellow-500/30 p-3 rounded-xl">
+                <div className="text-xs text-slate-400">BeiDou promedio</div>
+                <div className="text-2xl font-bold text-yellow-400">
+                  {snrHistory.length > 0 ? (snrHistory[snrHistory.length - 1].beidou).toFixed(1) : '0'} dB
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </div>
+
+      <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-r from-blue-800 to-blue-700 border-t border-blue-600 z-30 shadow-2xl">
+        <div className="flex items-center justify-around py-3 max-w-7xl mx-auto">
+          <button 
+            onClick={() => setActiveSection('imu')}
+            className={'flex flex-col items-center gap-1 transition-all ' + (
+              activeSection === 'imu' ? 'text-white scale-110' : 'text-blue-200 hover:text-white'
+            )}
+          >
+            <Activity className="w-6 h-6" />
+            <span className="text-xs font-semibold">IMU</span>
+          </button>
+          <button 
+            onClick={() => setActiveSection('skyplot')}
+            className={'flex flex-col items-center gap-1 transition-all ' + (
+              activeSection === 'skyplot' ? 'text-white scale-110' : 'text-blue-200 hover:text-white'
+            )}
+          >
+            <Navigation className="w-6 h-6" />
+            <span className="text-xs font-semibold">Skyplot</span>
+          </button>
+          <button 
+            onClick={() => setActiveSection('live')}
+            className="flex flex-col items-center gap-1 bg-blue-600 px-6 py-2 rounded-full shadow-lg"
+          >
+            <MapPin className="w-7 h-7 text-white" />
+          </button>
+          <button 
+            onClick={() => setActiveSection('ntrip')}
+            className={'flex flex-col items-center gap-1 transition-all ' + (
+              activeSection === 'ntrip' ? 'text-white scale-110' : 'text-blue-200 hover:text-white'
+            )}
+          >
+            <Radio className="w-6 h-6" />
+            <span className="text-xs font-semibold">NTRIP</span>
+          </button>
+          <button 
+            onClick={() => setActiveSection('projects')}
+            className={'flex flex-col items-center gap-1 transition-all ' + (
+              activeSection === 'projects' ? 'text-white scale-110' : 'text-blue-200 hover:text-white'
+            )}
+          >
+            <Database className="w-6 h-6" />
+            <span className="text-xs font-semibold">Obras</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default GNSSAIApp;
