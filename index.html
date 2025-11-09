@@ -1,0 +1,5369 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <!-- Copia siempre este archivo desde la vista "Raw" o usando curl/wget para evitar pegar parches con prefijos `diff --git` -->
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GNSS.AI Console</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdn.jsdelivr.net/npm/exifr/dist/exifr.min.js" defer></script>
+    <style>
+:root {
+    color-scheme: dark;
+    --bg: #0b1324;
+    --bg-elevated: rgba(19, 33, 63, 0.85);
+    --bg-panel: rgba(17, 28, 55, 0.7);
+    --bg-sidebar: rgba(12, 20, 40, 0.85);
+    --border: rgba(62, 126, 255, 0.35);
+    --border-strong: rgba(0, 188, 212, 0.45);
+    --text: #f5f9ff;
+    --text-muted: rgba(245, 249, 255, 0.64);
+    --accent: #32d4ff;
+    --accent-strong: #0ff0b3;
+    --danger: #ff6b7a;
+    --warning: #ffc75f;
+    --success: #5be7a9;
+    --shadow: 0 20px 50px rgba(6, 11, 23, 0.4);
+    --radius: 18px;
+    --transition: 200ms ease;
+    --blur: 18px;
+}
+
+body.light {
+    color-scheme: light;
+    --bg: #edf2fb;
+    --bg-elevated: rgba(255, 255, 255, 0.85);
+    --bg-panel: rgba(255, 255, 255, 0.75);
+    --bg-sidebar: rgba(231, 238, 255, 0.9);
+    --border: rgba(70, 95, 180, 0.18);
+    --border-strong: rgba(0, 132, 255, 0.3);
+    --text: #1a2234;
+    --text-muted: rgba(26, 34, 52, 0.6);
+    --accent: #0a84ff;
+    --accent-strong: #00c897;
+    --danger: #f43f5e;
+    --warning: #f59e0b;
+    --success: #22c55e;
+    --shadow: 0 20px 45px rgba(15, 23, 42, 0.12);
+    --blur: 22px;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: radial-gradient(circle at top, rgba(35, 82, 196, 0.35), transparent 55%),
+        radial-gradient(circle at 20% 80%, rgba(0, 255, 194, 0.25), transparent 45%),
+        var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    padding: 24px;
+    transition: background 400ms ease, color 200ms ease;
+}
+
+.layout {
+    display: grid;
+    grid-template-columns: 280px minmax(0, 1fr);
+    gap: 24px;
+    width: min(1300px, 100%);
+}
+
+.sidebar {
+    background: var(--bg-sidebar);
+    border-radius: calc(var(--radius) + 4px);
+    border: 1px solid var(--border);
+    padding: 28px 24px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    backdrop-filter: blur(var(--blur));
+    box-shadow: var(--shadow);
+}
+
+.brand {
+    display: grid;
+    gap: 4px;
+}
+
+.brand__title {
+    font-size: 1.8rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+}
+
+.brand__accent {
+    color: var(--accent);
+}
+
+.brand__subtitle {
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: 0.16em;
+}
+
+.menu {
+    display: grid;
+    gap: 12px;
+    margin: 32px 0;
+}
+
+.menu__item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border: 1px solid transparent;
+    padding: 12px 14px;
+    border-radius: calc(var(--radius) - 6px);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.95rem;
+    transition: var(--transition);
+}
+
+.menu__item:hover,
+.menu__item:focus-visible {
+    border-color: var(--border);
+    color: var(--text);
+    outline: none;
+}
+
+.menu__item i {
+    width: 20px;
+    height: 20px;
+}
+
+.menu__item.is-active {
+    background: linear-gradient(135deg, rgba(50, 212, 255, 0.25), rgba(15, 240, 179, 0.2));
+    border-color: var(--border-strong);
+    color: var(--text);
+    box-shadow: 0 10px 25px rgba(0, 179, 255, 0.18);
+}
+
+.sidebar__footer {
+    display: grid;
+    gap: 18px;
+}
+
+.session {
+    background: var(--bg-panel);
+    border-radius: calc(var(--radius) - 6px);
+    border: 1px solid var(--border);
+    padding: 14px 16px;
+    display: grid;
+    gap: 6px;
+}
+
+.session__label {
+    font-size: 0.75rem;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.session__value {
+    font-size: 1.4rem;
+    font-weight: 700;
+}
+
+.primary-btn,
+.ghost-btn,
+.icon-btn,
+.mode-toggle {
+    font: inherit;
+    border: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: var(--transition);
+}
+
+.primary-btn {
+    padding: 12px 18px;
+    border-radius: calc(var(--radius) - 6px);
+    background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+    color: #030712;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    box-shadow: 0 15px 35px rgba(3, 169, 244, 0.28);
+}
+
+.primary-btn:hover {
+    filter: brightness(1.05);
+}
+
+.icon-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+}
+
+.icon-btn:hover {
+    border-color: var(--border-strong);
+    color: var(--accent);
+}
+
+.mode-toggle {
+    padding: 10px 16px;
+    border-radius: 16px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    gap: 6px;
+}
+
+.mode-toggle__label {
+    text-transform: uppercase;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    color: var(--text-muted);
+}
+
+.mode-toggle__value {
+    font-weight: 700;
+}
+
+.ghost-btn {
+    padding: 10px 16px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text);
+}
+
+.ghost-btn:hover {
+    color: var(--accent);
+    border-color: var(--border);
+}
+
+.content {
+    display: grid;
+    gap: 24px;
+}
+
+.topbar {
+    background: var(--bg-elevated);
+    border-radius: calc(var(--radius) + 2px);
+    border: 1px solid var(--border);
+    padding: 22px 26px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    backdrop-filter: blur(var(--blur));
+    box-shadow: var(--shadow);
+}
+
+.status-group {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 140px));
+    gap: 14px;
+}
+
+.status-card {
+    background: var(--bg-panel);
+    padding: 16px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    display: grid;
+    gap: 6px;
+    position: relative;
+    overflow: hidden;
+}
+
+.status-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(120deg, rgba(50, 212, 255, 0.15), transparent 55%);
+    opacity: 0;
+    transition: var(--transition);
+}
+
+.status-card.is-active::after {
+    opacity: 1;
+}
+
+.status-card__label {
+    font-size: 0.75rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.status-card__value {
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+
+.topbar__actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.badge {
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--bg-panel);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--text-muted);
+}
+
+.view {
+    display: none;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.view.is-active {
+    display: flex;
+}
+
+.grid {
+    display: grid;
+    gap: 24px;
+}
+
+.grid--primary {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.grid--secondary {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.card {
+    background: var(--bg-elevated);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    padding: 22px 24px;
+    display: grid;
+    gap: 18px;
+    backdrop-filter: blur(calc(var(--blur) * 0.75));
+    box-shadow: var(--shadow);
+}
+
+.card.focus {
+    grid-column: span 2;
+}
+
+.card__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.card__title {
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.card__subtitle {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.solution {
+    display: grid;
+    gap: 18px;
+}
+
+.solution__utm {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    padding: 16px;
+    border-radius: var(--radius);
+    background: rgba(8, 15, 32, 0.65);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.solution__utm strong {
+    display: block;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.solution__utm span {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--text-muted);
+}
+
+.solution__utm p {
+    margin-top: 6px;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.solution__coords {
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.solution__alt {
+    display: grid;
+    gap: 6px;
+    color: var(--text-muted);
+}
+
+.solution__alt strong {
+    font-size: 1.15rem;
+    color: var(--text);
+}
+
+.solution__alt span {
+    font-size: 0.9rem;
+}
+
+.solution__meta {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 18px;
+}
+
+.solution__meta dt {
+    font-size: 0.75rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.solution__meta dd {
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.map-card {
+    min-height: 320px;
+}
+
+.map-card__controls {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.action-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+}
+
+.logging-state {
+    font-size: 0.8rem;
+    line-height: 1.4;
+    color: var(--text-muted);
+}
+
+.logging-state strong {
+    color: var(--text);
+    display: block;
+}
+
+.mobile-action-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 16px;
+    margin: 0 auto;
+    width: min(520px, calc(100% - 32px));
+    background: var(--bg-sidebar);
+    border: 1px solid var(--border);
+    border-radius: calc(var(--radius) + 6px);
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(calc(var(--blur) * 0.9));
+    padding: 14px 18px;
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    z-index: 35;
+}
+
+.mobile-action-bar__time {
+    display: grid;
+    gap: 2px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.mobile-action-bar__time strong {
+    color: var(--text);
+    font-size: 1rem;
+}
+
+.mobile-action-bar__actions {
+    display: flex;
+    gap: 10px;
+    flex: 1;
+    justify-content: flex-end;
+}
+
+.mobile-action-bar__actions .primary-btn,
+.mobile-action-bar__actions .ghost-btn {
+    flex: 1 1 150px;
+    justify-content: center;
+}
+
+.modal {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: rgba(7, 13, 26, 0.65);
+    backdrop-filter: blur(12px);
+    opacity: 0;
+    pointer-events: none;
+    transition: 200ms ease;
+    z-index: 40;
+}
+
+.modal.is-open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.modal__content {
+    width: min(460px, 92vw);
+    background: rgba(17, 28, 55, 0.92);
+    border-radius: calc(var(--radius) + 2px);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    padding: 28px 30px;
+    position: relative;
+    max-height: min(640px, 92vh);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transform: translateY(12px);
+    transition: var(--transition);
+}
+
+.modal.is-open .modal__content {
+    transform: translateY(0);
+}
+
+.modal__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px;
+}
+
+.modal__toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.modal__toolbar .ghost-btn,
+.modal__toolbar .primary-btn {
+    flex: 1 1 140px;
+    justify-content: center;
+}
+
+.modal__title {
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+
+.modal__close {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.form {
+    display: grid;
+    gap: 16px;
+}
+
+.modal__content .form {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 8px;
+    margin-right: -8px;
+    overscroll-behavior: contain;
+}
+
+.form__hint {
+    font-size: 0.75rem;
+    line-height: 1.45;
+    color: var(--text-muted);
+}
+
+.form__hint.is-success {
+    color: var(--success);
+}
+
+.form__hint.is-error {
+    color: var(--danger);
+}
+
+.form__group {
+    display: grid;
+    gap: 6px;
+}
+
+.form__row {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.form__toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.form__toolbar .ghost-btn,
+.form__toolbar .primary-btn {
+    flex: 1 1 160px;
+    justify-content: center;
+}
+
+.form__label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.form__input,
+.form__select,
+.form__textarea {
+    background: rgba(12, 20, 40, 0.65);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 12px;
+    color: var(--text);
+    font: inherit;
+    transition: var(--transition);
+}
+
+.form__textarea {
+    min-height: 90px;
+    resize: vertical;
+}
+
+.form__input:focus,
+.form__select:focus,
+.form__textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.switch {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: rgba(12, 20, 40, 0.45);
+    border: 1px solid var(--border);
+}
+
+.switch input {
+    appearance: none;
+    width: 44px;
+    height: 22px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.16);
+    position: relative;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.switch input::after {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--text);
+    transform: translateX(0);
+    transition: var(--transition);
+}
+
+.switch input:checked {
+    background: var(--accent);
+}
+
+.switch input:checked::after {
+    transform: translateX(22px);
+    background: var(--bg);
+}
+
+.switch__label {
+    font-weight: 600;
+}
+
+.modal__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 12px;
+    position: sticky;
+    bottom: -12px;
+    background: linear-gradient(180deg, rgba(11, 19, 36, 0), rgba(11, 19, 36, 0.92) 55%, rgba(11, 19, 36, 0.98));
+    padding: 16px 0 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.modal__content .modal__footer {
+    margin: 0 -30px -28px;
+    padding: 16px 30px 28px;
+}
+
+body.light .modal__footer {
+    background: linear-gradient(180deg, rgba(237, 242, 251, 0), rgba(237, 242, 251, 0.92) 55%, rgba(237, 242, 251, 0.98));
+    border-top-color: rgba(15, 23, 42, 0.08);
+}
+
+.modal__hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.ntrip {
+    display: grid;
+    gap: 12px;
+}
+
+.ntrip__item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.ntrip__item span:first-child {
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.ntrip__badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(50, 212, 255, 0.25);
+    background: rgba(50, 212, 255, 0.12);
+    color: var(--accent);
+}
+
+.logging-card {
+    display: grid;
+    gap: 14px;
+}
+
+.logging-card__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.logging-card__row span:first-child {
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.logging-card__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(50, 212, 255, 0.25);
+    background: rgba(50, 212, 255, 0.12);
+    color: var(--accent);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+}
+
+.tag--alt {
+    border-color: rgba(255, 199, 95, 0.35);
+    background: rgba(255, 199, 95, 0.15);
+    color: var(--warning);
+}
+
+.tag--success {
+    border-color: rgba(91, 231, 169, 0.35);
+    background: rgba(91, 231, 169, 0.18);
+    color: var(--success);
+}
+
+.stakeout {
+    display: grid;
+    gap: 16px;
+}
+
+.stakeout__status {
+    display: grid;
+    gap: 6px;
+}
+
+.stakeout__badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    width: fit-content;
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border: 1px solid rgba(50, 212, 255, 0.28);
+    background: rgba(50, 212, 255, 0.14);
+    color: var(--accent);
+}
+
+.stakeout__badge.is-success {
+    border-color: rgba(91, 231, 169, 0.35);
+    background: rgba(91, 231, 169, 0.18);
+    color: var(--success);
+}
+
+.stakeout__badge.is-warning {
+    border-color: rgba(255, 199, 95, 0.35);
+    background: rgba(255, 199, 95, 0.18);
+    color: var(--warning);
+}
+
+.stakeout__distance {
+    font-size: 2.1rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.stakeout__bearing {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+.stakeout__vectors {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.stakeout__vector {
+    flex: 1 1 140px;
+    padding: 14px 16px;
+    border-radius: calc(var(--radius) - 6px);
+    border: 1px solid var(--border);
+    background: rgba(12, 20, 40, 0.5);
+    text-align: center;
+}
+
+.stakeout__vector span {
+    display: block;
+    font-size: 0.68rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.stakeout__vector strong {
+    display: block;
+    margin-top: 6px;
+    font-size: 1.35rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.stakeout__vector small {
+    display: block;
+    margin-top: 4px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.stakeout__vector.is-positive strong {
+    color: var(--success);
+}
+
+.stakeout__vector.is-negative strong {
+    color: var(--danger);
+}
+
+.stakeout__vector.is-neutral strong {
+    color: var(--accent);
+}
+
+.stakeout__utm {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    border: 1px dashed var(--border);
+    border-radius: calc(var(--radius) - 8px);
+    padding: 14px 16px;
+    background: rgba(12, 20, 40, 0.45);
+}
+
+.stakeout__utm span {
+    display: block;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+}
+
+.stakeout__utm strong {
+    font-size: 1rem;
+}
+
+.stakeout__utm p {
+    margin-top: 4px;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.stakeout__grid span {
+    display: block;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+}
+
+.stakeout__grid strong {
+    font-size: 1rem;
+}
+
+.stakeout__guidance {
+    border-radius: 14px;
+    border: 1px dashed var(--border);
+    padding: 12px 16px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    background: rgba(12, 20, 40, 0.45);
+}
+
+.stakeout__guidance.is-success {
+    border-color: rgba(91, 231, 169, 0.6);
+    color: var(--success);
+}
+
+.stakeout__guidance.is-warning {
+    border-color: rgba(255, 199, 95, 0.6);
+    color: var(--warning);
+}
+
+.modal__badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: -6px;
+}
+
+.modal__badges .tag {
+    background: rgba(12, 20, 40, 0.65);
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.modal__section-title {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--text-muted);
+}
+
+.divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.08);
+    margin: 6px 0 12px;
+}
+
+body.light .modal__content {
+    background: rgba(255, 255, 255, 0.95);
+    border-color: rgba(70, 95, 180, 0.18);
+}
+
+body.light .form__input,
+body.light .form__select,
+body.light .form__textarea {
+    background: rgba(255, 255, 255, 0.9);
+    border-color: rgba(70, 95, 180, 0.2);
+    color: var(--text);
+}
+
+body.light .switch {
+    background: rgba(255, 255, 255, 0.75);
+    border-color: rgba(70, 95, 180, 0.18);
+}
+
+body.light .switch input {
+    background: rgba(26, 34, 52, 0.15);
+}
+
+body.light .switch input::after {
+    background: var(--bg);
+}
+
+body.light .stakeout__guidance {
+    background: rgba(255, 255, 255, 0.82);
+    border-color: rgba(70, 95, 180, 0.22);
+}
+
+body.light .modal__badges .tag {
+    background: rgba(231, 238, 255, 0.78);
+    border-color: rgba(70, 95, 180, 0.22);
+}
+
+body.light .tag {
+    background: rgba(13, 116, 255, 0.08);
+    border-color: rgba(13, 116, 255, 0.18);
+    color: var(--accent);
+}
+
+body.light .tag--alt {
+    background: rgba(255, 183, 77, 0.18);
+    border-color: rgba(255, 183, 77, 0.3);
+}
+
+body.light .tag--success {
+    background: rgba(34, 197, 94, 0.18);
+    border-color: rgba(34, 197, 94, 0.3);
+}
+
+.map {
+    height: 280px;
+    border-radius: calc(var(--radius) - 6px);
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.legend {
+    display: inline-flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.legend__item {
+    font-size: 0.75rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+}
+
+.legend__item--gps {
+    color: #5be7a9;
+}
+
+.legend__item--glo {
+    color: #ffc75f;
+}
+
+.legend__item--gal {
+    color: #32d4ff;
+}
+
+.constellations,
+.services,
+.timeline,
+.profiles,
+.files {
+    list-style: none;
+    display: grid;
+    gap: 16px;
+}
+
+.constellations li,
+.services li,
+.profiles li,
+.files li {
+    background: var(--bg-panel);
+    border-radius: calc(var(--radius) - 8px);
+    border: 1px solid var(--border);
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+}
+
+.constellations li span:first-child {
+    font-weight: 600;
+}
+
+.constellation__metrics {
+    display: inline-flex;
+    gap: 12px;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.constellations li::before,
+.services li::before,
+.timeline li::before,
+.files li::before,
+.profiles li::before {
+    content: "";
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    margin-right: 12px;
+    background: var(--tone, var(--accent));
+    box-shadow: 0 0 12px color-mix(in srgb, var(--tone, var(--accent)) 65%, transparent);
+}
+
+.photo-log {
+    display: grid;
+    gap: 16px;
+}
+
+.photo-log__empty {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.photo-log__item {
+    background: var(--bg-panel);
+    border-radius: calc(var(--radius) - 8px);
+    border: 1px solid var(--border);
+    padding: 16px 18px;
+    display: grid;
+    gap: 12px;
+}
+
+.photo-log__item header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.photo-log__item h3 {
+    font-size: 1rem;
+}
+
+.photo-log__meta {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px 18px;
+    font-size: 0.85rem;
+}
+
+.photo-log__meta dt {
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+}
+
+.photo-log__meta dd {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.photo-log__meta dd.is-hint {
+    font-weight: 500;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.services li.is-warning::before {
+    background: var(--warning);
+}
+
+.services li.is-danger::before {
+    background: var(--danger);
+}
+
+.imu {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 16px;
+}
+
+.imu div {
+    background: var(--bg-panel);
+    border-radius: calc(var(--radius) - 10px);
+    border: 1px solid var(--border);
+    padding: 14px 16px;
+    display: grid;
+    gap: 6px;
+}
+
+.imu dt {
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.imu dd {
+    font-weight: 600;
+}
+
+.timeline li {
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.timeline time {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.project {
+    display: grid;
+    gap: 16px;
+    background: var(--bg-panel);
+    border-radius: calc(var(--radius) - 6px);
+    border: 1px solid var(--border);
+    padding: 18px;
+}
+
+.project__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.project__details {
+    display: grid;
+    gap: 8px;
+}
+
+.coordinate-card {
+    display: grid;
+    gap: 16px;
+    background: var(--bg-panel);
+    border-radius: calc(var(--radius) - 6px);
+    border: 1px solid var(--border);
+    padding: 18px;
+}
+
+.coordinate-card__grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.coordinate-card__grid dl {
+    display: grid;
+    gap: 4px;
+}
+
+.coordinate-card__grid dt {
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.coordinate-card__grid dd {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.utm-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgba(50, 212, 255, 0.12);
+    border: 1px solid rgba(50, 212, 255, 0.35);
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.utm-chip i {
+    color: var(--accent);
+}
+
+.stakeout.is-idle {
+    display: grid;
+    place-items: center;
+    gap: 12px;
+    padding: 30px 18px;
+    text-align: center;
+    color: var(--text-muted);
+}
+
+.stakeout__status {
+    display: grid;
+    gap: 16px;
+}
+
+.stakeout__status .badge {
+    justify-self: start;
+}
+
+.stakeout__status dl {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 14px;
+}
+
+.stakeout__status dl div {
+    background: var(--bg-panel);
+    border-radius: calc(var(--radius) - 10px);
+    border: 1px solid var(--border);
+    padding: 12px 14px;
+    display: grid;
+    gap: 6px;
+}
+
+.stakeout__status dt {
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.stakeout__status dd {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.map-point-popup {
+    display: grid;
+    gap: 6px;
+    font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.map-point-popup span {
+    display: block;
+}
+
+.map-point-tags {
+    background: rgba(50, 212, 255, 0.16);
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    color: var(--accent);
+    justify-self: start;
+}
+
+.map-point-popup strong {
+    font-size: 1rem;
+}
+
+.table-wrapper {
+    overflow: auto;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.table thead {
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+.table th,
+.table td {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 10px 12px;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.table tbody tr:hover {
+    background: rgba(50, 212, 255, 0.08);
+}
+
+.table th.is-subtle,
+.table td.is-subtle {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+}
+
+.table td.is-utm {
+    font-variant-numeric: tabular-nums;
+    font-family: "Inter", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.table td.is-multiline {
+    white-space: normal;
+    line-height: 1.4;
+}
+
+.satellites {
+    display: grid;
+    gap: 14px;
+}
+
+.satellite {
+    display: grid;
+    grid-template-columns: 60px 1fr 70px;
+    gap: 18px;
+    align-items: center;
+    padding: 14px 16px;
+    background: var(--bg-panel);
+    border-radius: calc(var(--radius) - 8px);
+    border: 1px solid var(--border);
+}
+
+.satellite__id {
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+
+.satellite__bar {
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(50, 212, 255, 0.18);
+    position: relative;
+    overflow: hidden;
+}
+
+.satellite__bar span {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+}
+
+.polar {
+    min-height: 320px;
+    border-radius: calc(var(--radius) - 6px);
+    border: 1px dashed var(--border);
+    display: grid;
+    place-items: center;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.commands {
+    display: grid;
+    gap: 16px;
+}
+
+.command {
+    background: var(--bg-panel);
+    border-radius: calc(var(--radius) - 8px);
+    border: 1px solid var(--border);
+    padding: 16px 18px;
+    display: grid;
+    gap: 8px;
+}
+
+.command__title {
+    font-weight: 700;
+}
+
+.command__desc {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.command__actions {
+    display: flex;
+    gap: 12px;
+}
+
+.command__actions button {
+    flex: none;
+}
+
+.files li {
+    align-items: center;
+}
+
+.files span {
+    display: grid;
+    gap: 4px;
+}
+
+.sync {
+    display: grid;
+    gap: 16px;
+    background: var(--bg-panel);
+    border-radius: calc(var(--radius) - 6px);
+    border: 1px solid var(--border);
+    padding: 18px;
+}
+
+.toast {
+    position: fixed;
+    inset: auto 24px 24px auto;
+    padding: 14px 18px;
+    border-radius: 12px;
+    background: rgba(12, 20, 40, 0.95);
+    color: #f8fafc;
+    font-weight: 600;
+    box-shadow: 0 20px 45px rgba(3, 8, 20, 0.6);
+    opacity: 0;
+    transform: translateY(20px);
+    transition: 200ms ease;
+    pointer-events: none;
+}
+
+.toast.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+@media (max-width: 1100px) {
+    body {
+        padding: 16px;
+        padding-bottom: 110px;
+    }
+
+    .layout {
+        grid-template-columns: 1fr;
+    }
+
+    .sidebar {
+        flex-direction: row;
+        align-items: center;
+        gap: 24px;
+    }
+
+    .sidebar__footer {
+        display: none;
+    }
+
+    .mobile-action-bar {
+        display: flex;
+    }
+
+    .menu {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 10px;
+        margin: 0;
+    }
+
+    .brand {
+        min-width: 180px;
+    }
+
+    .topbar {
+        flex-direction: column;
+        gap: 18px;
+        align-items: stretch;
+    }
+
+    .status-group {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 720px) {
+    .status-group {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .card.focus {
+        grid-column: auto;
+    }
+
+    .map-card__controls {
+        justify-content: flex-start;
+    }
+
+    .solution__utm {
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    }
+
+    .modal__content {
+        width: calc(100vw - 24px);
+        max-height: calc(100vh - 24px);
+        height: auto;
+        border-radius: calc(var(--radius) + 4px);
+        padding: 22px 22px 28px;
+    }
+
+    .modal__content .form {
+        padding-right: 0;
+        margin-right: 0;
+    }
+
+    .modal__toolbar {
+        margin-bottom: 6px;
+    }
+
+    .modal__footer {
+        margin: 0 -22px -22px;
+        padding: 14px 22px 22px;
+        bottom: 0;
+    }
+
+    .legend__item {
+        font-size: 0.65rem;
+    }
+}
+</style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.364.0/dist/umd/lucide.js" defer></script>
+    
+</head>
+<body>
+    <div class="layout">
+        <aside class="sidebar">
+            <div class="brand">
+                <span class="brand__title">GNSS<span class="brand__accent">.AI</span></span>
+                <span class="brand__subtitle">Control de estación K922</span>
+            </div>
+            <nav class="menu" aria-label="Secciones GNSS">
+                <button class="menu__item is-active" data-view="overview" aria-current="page">
+                    <i data-lucide="activity"></i>
+                    <span>Monitoreo</span>
+                </button>
+                <button class="menu__item" data-view="survey">
+                    <i data-lucide="map"></i>
+                    <span>Levantamiento</span>
+                </button>
+                <button class="menu__item" data-view="satellites">
+                    <i data-lucide="satellite"></i>
+                    <span>Satélites</span>
+                </button>
+                <button class="menu__item" data-view="control">
+                    <i data-lucide="settings"></i>
+                    <span>Comandos</span>
+                </button>
+                <button class="menu__item" data-view="files">
+                    <i data-lucide="folder-open"></i>
+                    <span>Registro</span>
+                </button>
+            </nav>
+            <div class="sidebar__footer">
+                <div class="session" id="sessionInfo">
+                    <div class="session__label">Sesión RTK</div>
+                    <div class="session__value">--:--</div>
+                </div>
+                <button class="primary-btn" id="recordBtn">
+                    <i data-lucide="radio"></i>
+                    <span>Iniciar registro</span>
+                </button>
+                <button class="ghost-btn" id="loggingConfigBtn">
+                    <i data-lucide="sliders-horizontal"></i>
+                    Ajustes de logging
+                </button>
+                <div class="logging-state" id="loggingSummary">
+                    <strong>Perfil activo:</strong>
+                    NMEA + RINEX · 1 Hz
+                </div>
+            </div>
+        </aside>
+        <main class="content">
+            <header class="topbar">
+                <div class="status-group">
+                    <div class="status-card" id="gnssStatus">
+                        <span class="status-card__label">GNSS</span>
+                        <span class="status-card__value">Offline</span>
+                    </div>
+                    <div class="status-card" id="rtkStatus">
+                        <span class="status-card__label">RTK</span>
+                        <span class="status-card__value">Sin solución</span>
+                    </div>
+                    <div class="status-card" id="imuStatus">
+                        <span class="status-card__label">IMU</span>
+                        <span class="status-card__value">Inactiva</span>
+                    </div>
+                    <div class="status-card" id="networkStatus">
+                        <span class="status-card__label">NTRIP</span>
+                        <span class="status-card__value">Desconectado</span>
+                    </div>
+                </div>
+                <div class="topbar__actions">
+                    <div class="badge" id="firmwareBadge">FW K922 · v1.4</div>
+                    <button class="icon-btn" id="refreshBtn" aria-label="Actualizar estado">
+                        <i data-lucide="refresh-cw"></i>
+                    </button>
+                    <button class="mode-toggle" id="modeToggle" aria-label="Cambiar modo">
+                        <span class="mode-toggle__label">Modo</span>
+                        <span class="mode-toggle__value">Rover</span>
+                    </button>
+                    <button class="ghost-btn" id="ntripConfigBtn">
+                        <i data-lucide="cast"></i>
+                        NTRIP
+                    </button>
+                    <button class="icon-btn" id="themeToggle" aria-label="Cambiar tema">
+                        <i data-lucide="moon-star"></i>
+                    </button>
+                </div>
+            </header>
+            <section class="view is-active" id="overviewView">
+                <div class="grid grid--primary">
+                    <article class="card focus">
+                        <header class="card__header">
+                            <div>
+                                <h2 class="card__title">Solución Actual</h2>
+                                <p class="card__subtitle" id="solutionSubtitle">Esperando datos GNSS</p>
+                            </div>
+                            <button class="ghost-btn" id="copyCoords">
+                                <i data-lucide="copy"></i>
+                                Copiar coordenadas
+                            </button>
+                        </header>
+                        <div class="solution">
+                            <div class="solution__coords" id="latLon"></div>
+                            <div class="solution__alt">
+                                <strong id="altitudeEllipsoidal">Altitud elipsoidal --</strong>
+                                <span id="altitudeOrthometric">Altura ortométrica --</span>
+                                <span id="geoidInfo">Geoid EGM2008 Perú: --</span>
+                            </div>
+                            <dl class="solution__meta">
+                                <div>
+                                    <dt>Precisión horizontal</dt>
+                                    <dd id="hAccuracy">--</dd>
+                                </div>
+                                <div>
+                                    <dt>HDOP</dt>
+                                    <dd id="hdop">--</dd>
+                                </div>
+                                <div>
+                                    <dt>Satélites</dt>
+                                    <dd id="satCount">--</dd>
+                                </div>
+                                <div>
+                                    <dt>Edad corrección</dt>
+                                    <dd id="correctionAge">--</dd>
+                                </div>
+                            </dl>
+                            <div class="solution__utm" id="utmSummary">
+                                <div>
+                                    <span>Zona UTM</span>
+                                    <strong id="utmZone">—</strong>
+                                    <p id="utmEN">—</p>
+                                </div>
+                                <div>
+                                    <span>Actualización</span>
+                                    <strong id="positionSource">Simulado</strong>
+                                    <p id="positionUpdated">—</p>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                    <article class="card map-card">
+                        <header class="card__header">
+                            <div>
+                                <h2 class="card__title">Mapa en tiempo real</h2>
+                                <p class="card__subtitle">Posición GNSS sobre mosaico satelital</p>
+                            </div>
+                            <div class="map-card__controls">
+                                <button class="ghost-btn" id="mapReset">
+                                    <i data-lucide="target"></i>
+                                    Centrar
+                                </button>
+                                <button class="ghost-btn" id="mapLayer">
+                                    <i data-lucide="layers"></i>
+                                    Capa
+                                </button>
+                                <button class="ghost-btn" id="mapManual">
+                                    <i data-lucide="map-pin"></i>
+                                    Fijar manual
+                                </button>
+                            </div>
+                        </header>
+                        <div class="map" id="map"></div>
+                    </article>
+                    <article class="card">
+                        <header class="card__header">
+                            <div>
+                                <h2 class="card__title">Historial de SNR</h2>
+                                <p class="card__subtitle">Últimos 10 segundos</p>
+                            </div>
+                            <div class="legend">
+                                <span class="legend__item legend__item--gps">GPS</span>
+                                <span class="legend__item legend__item--glo">GLONASS</span>
+                                <span class="legend__item legend__item--gal">Galileo</span>
+                            </div>
+                        </header>
+                        <canvas id="snrChart" height="180"></canvas>
+                    </article>
+                    <article class="card">
+                        <header class="card__header">
+                            <div>
+                                <h2 class="card__title">Constelaciones</h2>
+                                <p class="card__subtitle">Estado combinado</p>
+                            </div>
+                        </header>
+                        <ul class="constellations" id="constellationsList"></ul>
+                    </article>
+                </div>
+                <div class="grid grid--secondary">
+                    <article class="card">
+                        <header class="card__header">
+                            <h2 class="card__title">Estado de servicios</h2>
+                        </header>
+                        <ul class="services" id="servicesList"></ul>
+                    </article>
+                    <article class="card">
+                        <header class="card__header">
+                            <div>
+                                <h2 class="card__title">Correcciones NTRIP</h2>
+                                <p class="card__subtitle">Caster remoto y sesión</p>
+                            </div>
+                            <button class="ghost-btn" id="ntripCardBtn">
+                                <i data-lucide="settings-2"></i>
+                                Configurar
+                            </button>
+                        </header>
+                        <div class="ntrip" id="ntripSummary"></div>
+                    </article>
+                    <article class="card">
+                        <header class="card__header">
+                            <h2 class="card__title">IMU &amp; Tilt</h2>
+                        </header>
+                        <dl class="imu" id="imuStats"></dl>
+                    </article>
+                    <article class="card">
+                        <header class="card__header">
+                            <h2 class="card__title">Eventos</h2>
+                        </header>
+                        <ul class="timeline" id="timeline"></ul>
+                    </article>
+                </div>
+            </section>
+            <section class="view" id="surveyView" aria-hidden="true">
+                <div class="grid">
+                    <article class="card">
+                        <header class="card__header">
+                            <div>
+                                <h2 class="card__title">Sistema de coordenadas</h2>
+                                <p class="card__subtitle">UTM WGS84 · Geoid EGM2008 Perú</p>
+                            </div>
+                            <button class="ghost-btn" id="coordinateConfigBtn">
+                                <i data-lucide="globe-2"></i>
+                                Ajustar datum
+                            </button>
+                        </header>
+                        <div class="coordinate-card" id="coordinateCard"></div>
+                    </article>
+                    <article class="card">
+                        <header class="card__header">
+                            <div>
+                                <h2 class="card__title">Proyecto activo</h2>
+                                <p class="card__subtitle">Gestión de puntos y stakeout</p>
+                            </div>
+                            <div class="action-toolbar">
+                                <button class="primary-btn" id="newPointBtn">
+                                    <i data-lucide="plus"></i>
+                                    Nuevo punto
+                                </button>
+                                <button class="ghost-btn" id="projectConfigBtn">
+                                    <i data-lucide="folder-cog"></i>
+                                    Gestionar proyecto
+                                </button>
+                            </div>
+                        </header>
+                        <div class="project" id="projectSummary"></div>
+                    </article>
+                    <article class="card">
+                        <header class="card__header">
+                            <div>
+                                <h2 class="card__title">Replanteo activo</h2>
+                                <p class="card__subtitle" id="stakeoutSubtitle">Define un objetivo para guiar</p>
+                            </div>
+                            <button class="ghost-btn" id="stakeoutBtn">
+                                <i data-lucide="navigation-2"></i>
+                                Configurar
+                            </button>
+                        </header>
+                        <div class="stakeout" id="stakeoutPanel"></div>
+                    </article>
+                    <article class="card">
+                        <header class="card__header">
+                            <h2 class="card__title">Puntos almacenados</h2>
+                        </header>
+                        <div class="table-wrapper">
+                            <table class="table" id="pointsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Nombre</th>
+                                        <th>Zona</th>
+                                        <th>E (m)</th>
+                                        <th>N (m)</th>
+                                        <th class="is-subtle">Latitud</th>
+                                        <th class="is-subtle">Longitud</th>
+                                        <th>Alt. elip.</th>
+                                        <th>Alt. ortom.</th>
+                                        <th>Precisión</th>
+                                        <th>Fecha</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </article>
+                </div>
+            </section>
+            <section class="view" id="satellitesView" aria-hidden="true">
+                <div class="grid">
+                    <article class="card">
+                        <header class="card__header">
+                            <div>
+                                <h2 class="card__title">Panel de satélites</h2>
+                                <p class="card__subtitle">Potencia de señal y elevación</p>
+                            </div>
+                        </header>
+                        <div class="satellites" id="satellitesPanel"></div>
+                    </article>
+                    <article class="card">
+                        <header class="card__header">
+                            <h2 class="card__title">Gráfico polar</h2>
+                        </header>
+                        <div class="polar" id="polarChart"></div>
+                    </article>
+                </div>
+            </section>
+            <section class="view" id="controlView" aria-hidden="true">
+                <div class="grid">
+                    <article class="card">
+                        <header class="card__header">
+                            <h2 class="card__title">Comandos rápidos K922</h2>
+                        </header>
+                        <div class="commands" id="commandList"></div>
+                    </article>
+                    <article class="card">
+                        <header class="card__header">
+                            <h2 class="card__title">Perfiles de operación</h2>
+                        </header>
+                        <ul class="profiles" id="profiles"></ul>
+                    </article>
+                </div>
+            </section>
+            <section class="view" id="filesView" aria-hidden="true">
+                <div class="grid">
+                    <article class="card">
+                        <header class="card__header">
+                            <div>
+                                <h2 class="card__title">Perfil de registro</h2>
+                                <p class="card__subtitle">Formatos y automatización</p>
+                            </div>
+                            <button class="ghost-btn" id="loggingCardBtn">
+                                <i data-lucide="sliders"></i>
+                                Ajustar
+                            </button>
+                        </header>
+                        <div class="logging-card" id="loggingCard"></div>
+                    </article>
+                    <article class="card">
+                        <header class="card__header">
+                            <h2 class="card__title">Registros recientes</h2>
+                        </header>
+                        <ul class="files" id="fileList"></ul>
+                    </article>
+                    <article class="card">
+                        <header class="card__header">
+                            <div>
+                                <h2 class="card__title">Captura fotogramétrica</h2>
+                                <p class="card__subtitle">Fotos con metadatos EXIF listos para fotogrametría</p>
+                            </div>
+                            <button class="primary-btn" id="capturePhotoBtn" type="button">
+                                <i data-lucide="camera"></i>
+                                Tomar foto
+                            </button>
+                        </header>
+                        <input type="file" id="photoInput" accept="image/*" capture="environment" hidden />
+                        <div class="photo-log" id="photoLog">
+                            <p class="photo-log__empty">Aún no hay capturas. Usa “Tomar foto” para registrar la primera.</p>
+                        </div>
+                    </article>
+                    <article class="card">
+                        <header class="card__header">
+                            <h2 class="card__title">Sincronización</h2>
+                        </header>
+                        <div class="sync" id="syncPanel"></div>
+                    </article>
+                </div>
+            </section>
+        </main>
+    </div>
+    <div class="mobile-action-bar" id="mobileActionBar">
+        <div class="mobile-action-bar__time">
+            <span>Sesión RTK</span>
+            <strong id="mobileSessionTime">--:--</strong>
+        </div>
+        <div class="mobile-action-bar__actions">
+            <button class="primary-btn" id="mobileRecordBtn" type="button">
+                <i data-lucide="radio"></i>
+                Iniciar registro
+            </button>
+            <button class="ghost-btn" id="mobileLoggingBtn" type="button">
+                <i data-lucide="sliders-horizontal"></i>
+                Logging
+            </button>
+        </div>
+    </div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <div class="modal" id="pointModal" aria-hidden="true">
+        <div class="modal__content">
+            <div class="modal__header">
+                <h2 class="modal__title">Capturar punto</h2>
+                <button class="modal__close" type="button" data-modal-close>
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <form class="form" id="pointForm">
+                <div class="modal__badges">
+                    <span class="tag" id="pointFixBadge">Solución desconocida</span>
+                    <span class="tag tag--alt" id="pointAccuracyBadge">Precisión -- cm</span>
+                </div>
+                <span class="modal__section-title">Identificación</span>
+                <div class="divider"></div>
+                <div class="form__row">
+                    <div class="form__group">
+                        <label class="form__label" for="pointName">Código</label>
+                        <input class="form__input" id="pointName" name="pointName" required />
+                    </div>
+                    <div class="form__group">
+                        <label class="form__label" for="pointFeature">Tipo</label>
+                        <select class="form__select" id="pointFeature" name="pointFeature">
+                            <option value="control">Punto de control</option>
+                            <option value="detalle">Detalle topográfico</option>
+                            <option value="limite">Límite / lindero</option>
+                            <option value="monumento">Monumento</option>
+                            <option value="otro">Otro</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form__row">
+                    <div class="form__group">
+                        <label class="form__label" for="pointDescription">Descripción</label>
+                        <input class="form__input" id="pointDescription" name="pointDescription" placeholder="Esquina, hito, árbol..." />
+                    </div>
+                    <div class="form__group">
+                        <label class="form__label" for="pointAttributes">Etiquetas</label>
+                        <input class="form__input" id="pointAttributes" name="pointAttributes" placeholder="Relleno, vialidad, poste" />
+                    </div>
+                </div>
+                <span class="modal__section-title">Coordenadas UTM</span>
+                <div class="divider"></div>
+                <div class="form__row">
+                    <div class="form__group">
+                        <label class="form__label" for="pointZone">Zona</label>
+                        <input class="form__input" id="pointZone" name="pointZone" readonly />
+                    </div>
+                    <div class="form__group">
+                        <label class="form__label" for="pointHemisphere">Hemisferio</label>
+                        <input class="form__input" id="pointHemisphere" name="pointHemisphere" readonly />
+                    </div>
+                </div>
+                <div class="form__row">
+                    <div class="form__group">
+                        <label class="form__label" for="pointEasting">Este (m)</label>
+                        <input class="form__input" type="number" step="0.001" id="pointEasting" name="pointEasting" />
+                    </div>
+                    <div class="form__group">
+                        <label class="form__label" for="pointNorthing">Norte (m)</label>
+                        <input class="form__input" type="number" step="0.001" id="pointNorthing" name="pointNorthing" />
+                    </div>
+                </div>
+                <div class="form__row">
+                    <div class="form__group">
+                        <label class="form__label" for="pointLat">Latitud (°)</label>
+                        <input class="form__input" type="number" step="0.000001" id="pointLat" name="pointLat" />
+                    </div>
+                    <div class="form__group">
+                        <label class="form__label" for="pointLon">Longitud (°)</label>
+                        <input class="form__input" type="number" step="0.000001" id="pointLon" name="pointLon" />
+                    </div>
+                </div>
+                <div class="form__row">
+                    <div class="form__group">
+                        <label class="form__label" for="pointEllipsoidal">Altura elipsoidal (m)</label>
+                        <input class="form__input" type="number" step="0.01" id="pointEllipsoidal" name="pointEllipsoidal" />
+                    </div>
+                    <div class="form__group">
+                        <label class="form__label" for="pointOrthometric">Altura ortométrica (m)</label>
+                        <input class="form__input" type="number" step="0.01" id="pointOrthometric" name="pointOrthometric" />
+                    </div>
+                </div>
+                <p class="form__hint">Se aplican los parámetros del elipsoide y geoid configurados (EGM2008 Perú). Puedes editar valores antes de guardar.</p>
+                <div class="form__group">
+                    <label class="form__label" for="pointNotes">Notas de campo</label>
+                    <textarea class="form__textarea" id="pointNotes" name="pointNotes" placeholder="Responsable de la toma, condiciones, referencia visual"></textarea>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="pointStakeout" name="pointStakeout" />
+                    <span class="switch__label">Preparar este punto para replanteo inmediato</span>
+                </label>
+                <div class="modal__footer">
+                    <button type="button" class="ghost-btn" data-modal-close>Cancelar</button>
+                    <button type="submit" class="primary-btn">Guardar punto</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="modal" id="projectModal" aria-hidden="true">
+        <div class="modal__content">
+            <div class="modal__header">
+                <h2 class="modal__title">Gestionar proyecto</h2>
+                <button class="modal__close" type="button" data-modal-close>
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <form class="form" id="projectForm">
+                <div class="form__group">
+                    <label class="form__label" for="projectName">Nombre del proyecto</label>
+                    <input class="form__input" id="projectName" name="projectName" required />
+                </div>
+                <div class="form__row">
+                    <div class="form__group">
+                        <label class="form__label" for="projectLocation">Zona / ubicación</label>
+                        <input class="form__input" id="projectLocation" name="projectLocation" />
+                    </div>
+                    <div class="form__group">
+                        <label class="form__label" for="projectOwner">Responsable</label>
+                        <input class="form__input" id="projectOwner" name="projectOwner" />
+                    </div>
+                </div>
+                <div class="form__row">
+                    <div class="form__group">
+                        <label class="form__label" for="projectAccuracy">Precisión objetivo</label>
+                        <input class="form__input" id="projectAccuracy" name="projectAccuracy" placeholder="Ej. 2 cm RMS" />
+                    </div>
+                    <div class="form__group">
+                        <label class="form__label" for="projectCode">Código interno</label>
+                        <input class="form__input" id="projectCode" name="projectCode" placeholder="GNSS-2024-TRU" />
+                    </div>
+                </div>
+                <div class="form__group">
+                    <label class="form__label" for="projectNotes">Notas</label>
+                    <textarea class="form__textarea" id="projectNotes" name="projectNotes" placeholder="Observaciones, referencias de control o requerimientos"></textarea>
+                </div>
+                <span class="modal__section-title">Stakeout previsto</span>
+                <div class="divider"></div>
+                <div class="form__row">
+                    <div class="form__group">
+                        <label class="form__label" for="stakeoutTarget">Objetivo</label>
+                        <input class="form__input" id="stakeoutTarget" name="stakeoutTarget" placeholder="P-023" />
+                    </div>
+                    <div class="form__group">
+                        <label class="form__label" for="stakeoutDistance">Distancia estimada (m)</label>
+                        <input class="form__input" type="number" step="0.01" id="stakeoutDistance" name="stakeoutDistance" />
+                    </div>
+                    <div class="form__group">
+                        <label class="form__label" for="stakeoutBearing">Rumbo previsto (°)</label>
+                        <input class="form__input" type="number" step="0.1" id="stakeoutBearing" name="stakeoutBearing" />
+                    </div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="projectReset" name="projectReset" />
+                    <span class="switch__label">Vaciar la lista de puntos al crear un nuevo proyecto</span>
+                </label>
+                <div class="modal__footer">
+                    <button type="button" class="ghost-btn" data-modal-close>Cancelar</button>
+                    <button type="submit" class="primary-btn">Guardar proyecto</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="modal" id="coordinateModal" aria-hidden="true">
+        <div class="modal__content">
+            <div class="modal__header">
+                <h2 class="modal__title">Parámetros geodésicos</h2>
+                <button class="modal__close" type="button" data-modal-close>
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <form class="form" id="coordinateForm">
+                <div class="modal__badges">
+                    <span class="tag" id="coordinateEllipsoidBadge"></span>
+                    <span class="tag tag--success" id="coordinateGeoidBadge"></span>
+                </div>
+                <span class="modal__section-title">Datum y proyección</span>
+                <div class="divider"></div>
+                <div class="form__group">
+                    <label class="form__label" for="coordinateEllipsoid">Elipsoide</label>
+                    <select class="form__select" id="coordinateEllipsoid" name="coordinateEllipsoid">
+                        <option value="WGS84-IGN">WGS84-IGN (Perú oficial)</option>
+                        <option value="WGS84">WGS84</option>
+                        <option value="SIRGAS2000">SIRGAS2000</option>
+                        <option value="GRS80">GRS80</option>
+                        <option value="PSAD56">PSAD56</option>
+                    </select>
+                </div>
+                <div class="form__row">
+                    <div class="form__group">
+                        <label class="form__label" for="coordinateProjection">Proyección</label>
+                        <select class="form__select" id="coordinateProjection" name="coordinateProjection">
+                            <option value="UTM">UTM</option>
+                            <option value="Geográficas">Geográficas</option>
+                        </select>
+                    </div>
+                    <div class="form__group">
+                        <label class="form__label" for="coordinateZone">Zona UTM</label>
+                        <input class="form__input" type="number" id="coordinateZone" name="coordinateZone" min="1" max="60" placeholder="Auto" />
+                    </div>
+                </div>
+                <span class="modal__section-title">Modelo geoidal</span>
+                <div class="divider"></div>
+                <div class="form__group">
+                    <label class="form__label" for="coordinateGeoid">Geoid</label>
+                    <select class="form__select" id="coordinateGeoid" name="coordinateGeoid">
+                        <option value="EGM2008-PERU">EGM2008 Perú (IGN)</option>
+                        <option value="EGM96">EGM96 Global</option>
+                        <option value="NONE">Sin corrección</option>
+                        <option value="CUSTOM">Personalizado</option>
+                    </select>
+                </div>
+                <div class="form__row" id="coordinateCustomRow">
+                    <div class="form__group">
+                        <label class="form__label" for="coordinateUndulation">Ondulación (m)</label>
+                        <input class="form__input" type="number" step="0.01" id="coordinateUndulation" name="coordinateUndulation" placeholder="Ej. 30.25" />
+                    </div>
+                    <div class="form__group">
+                        <label class="form__label" for="coordinateRegion">Región</label>
+                        <select class="form__select" id="coordinateRegion" name="coordinateRegion">
+                            <option value="auto">Auto según coordenada</option>
+                            <option value="costa-norte">Costa norte</option>
+                            <option value="costa-centro">Costa centro</option>
+                            <option value="costa-sur">Costa sur</option>
+                            <option value="sierra-norte">Sierra norte</option>
+                            <option value="sierra-centro">Sierra centro</option>
+                            <option value="sierra-sur">Sierra sur</option>
+                            <option value="selva-norte">Selva norte</option>
+                            <option value="selva-centro">Selva centro-sur</option>
+                        </select>
+                    </div>
+                </div>
+                <p class="form__hint">Para Perú se recomienda EGM2008 Perú (IGN) con ondulación automática por zona.</p>
+                <span class="modal__section-title">Alturas</span>
+                <div class="divider"></div>
+                <div class="form__row">
+                    <div class="form__group">
+                        <label class="form__label" for="coordinateInstrument">Altura de instrumento (m)</label>
+                        <input class="form__input" type="number" step="0.01" id="coordinateInstrument" name="coordinateInstrument" placeholder="Ej. 1.80" />
+                    </div>
+                    <div class="form__group">
+                        <label class="form__label" for="coordinateReference">Referencia vertical</label>
+                        <select class="form__select" id="coordinateReference" name="coordinateReference">
+                            <option value="EGM2008">EGM2008 (IGN)</option>
+                            <option value="EGM96">EGM96</option>
+                            <option value="ELLIPSOID">Solo elipsoidal</option>
+                        </select>
+                    </div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="coordinateAutoLock" name="coordinateAutoLock" />
+                    <span class="switch__label">Bloquear solución cuando se ajuste manualmente la zona o ondulación</span>
+                </label>
+                <div class="modal__footer">
+                    <button type="button" class="ghost-btn" data-modal-close>Cancelar</button>
+                    <button type="submit" class="primary-btn">Guardar parámetros</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="modal" id="ntripModal" aria-hidden="true">
+        <div class="modal__content">
+            <div class="modal__header">
+                <h2 class="modal__title">Configuración NTRIP</h2>
+                <button class="modal__close" type="button" data-modal-close>
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal__toolbar">
+                <button type="button" class="ghost-btn" id="ntripShareLink">
+                    <i data-lucide="share-2"></i>
+                    Generar enlace
+                </button>
+                <button type="button" class="ghost-btn" id="ntripShareToken">
+                    <i data-lucide="copy"></i>
+                    Copiar token
+                </button>
+            </div>
+            <form class="form" id="ntripForm">
+                <label class="switch">
+                    <input type="checkbox" id="ntripEnabled" name="ntripEnabled" />
+                    <span class="switch__label">Activar sesión NTRIP</span>
+                </label>
+                <div class="form__row">
+                    <div class="form__group">
+                        <label class="form__label" for="ntripCaster">Caster / host</label>
+                        <input class="form__input" id="ntripCaster" name="ntripCaster" placeholder="caster.midominio.com" />
+                    </div>
+                    <div class="form__group">
+                        <label class="form__label" for="ntripPort">Puerto</label>
+                        <input class="form__input" type="number" id="ntripPort" name="ntripPort" placeholder="2101" />
+                    </div>
+                </div>
+                <div class="form__row">
+                    <div class="form__group">
+                        <label class="form__label" for="ntripMountpoint">Mountpoint</label>
+                        <input class="form__input" id="ntripMountpoint" name="ntripMountpoint" placeholder="K922_RT" />
+                    </div>
+                    <div class="form__group">
+                        <label class="form__label" for="ntripFormat">Formato RTCM</label>
+                        <select class="form__select" id="ntripFormat" name="ntripFormat">
+                            <option value="RTCM 3.0">RTCM 3.0</option>
+                            <option value="RTCM 3.2">RTCM 3.2</option>
+                            <option value="RTCM 3.3">RTCM 3.3</option>
+                            <option value="MSM4">MSM4</option>
+                            <option value="MSM7">MSM7</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form__row">
+                    <div class="form__group">
+                        <label class="form__label" for="ntripUser">Usuario</label>
+                        <input class="form__input" id="ntripUser" name="ntripUser" />
+                    </div>
+                    <div class="form__group">
+                        <label class="form__label" for="ntripPass">Contraseña</label>
+                        <input class="form__input" type="password" id="ntripPass" name="ntripPass" />
+                    </div>
+                </div>
+                <div class="form__row">
+                    <div class="form__group">
+                        <label class="form__label" for="ntripBitrate">Bitrate esperado</label>
+                        <input class="form__input" id="ntripBitrate" name="ntripBitrate" placeholder="56 kbps" />
+                    </div>
+                    <div class="form__group">
+                        <label class="form__label" for="ntripLatency">Latencia objetivo (s)</label>
+                        <input class="form__input" type="number" step="0.1" id="ntripLatency" name="ntripLatency" />
+                    </div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="ntripSsl" name="ntripSsl" />
+                    <span class="switch__label">Usar TLS/SSL (https)</span>
+                </label>
+                <div class="form__group">
+                    <label class="form__label" for="ntripNotes">Notas o recordatorios</label>
+                    <textarea class="form__textarea" id="ntripNotes" name="ntripNotes" placeholder="Credenciales de respaldo, IP alterna, etc."></textarea>
+                </div>
+                <div class="form__group">
+                    <label class="form__label" for="ntripTransfer">Importar / compartir</label>
+                    <textarea class="form__textarea" id="ntripTransfer" name="ntripTransfer" placeholder="Pega un enlace o token GNSS.AI NTRIP"></textarea>
+                    <p class="form__hint" id="ntripTransferStatus">Genera un enlace para compartir con otro dispositivo o pega uno existente.</p>
+                    <div class="form__toolbar">
+                        <button type="button" class="ghost-btn" id="ntripImportApply">
+                            <i data-lucide="download"></i>
+                            Aplicar token
+                        </button>
+                        <button type="button" class="ghost-btn" id="ntripTransferClear">
+                            <i data-lucide="eraser"></i>
+                            Limpiar
+                        </button>
+                    </div>
+                </div>
+                <div class="modal__footer">
+                    <button type="button" class="ghost-btn" data-modal-close>Cancelar</button>
+                    <button type="submit" class="primary-btn">Guardar NTRIP</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="modal" id="loggingModal" aria-hidden="true">
+        <div class="modal__content">
+            <div class="modal__header">
+                <h2 class="modal__title">Ajustes de logging</h2>
+                <button class="modal__close" type="button" data-modal-close>
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <form class="form" id="loggingForm">
+                <div class="modal__badges">
+                    <span class="tag" id="loggingStorageBadge"></span>
+                    <span class="tag tag--success" id="loggingAutoBadge"></span>
+                </div>
+                <span class="modal__section-title">Formatos</span>
+                <div class="divider"></div>
+                <label class="switch">
+                    <input type="checkbox" id="loggingNmea" name="loggingNmea" />
+                    <span class="switch__label">Registrar NMEA (GGA, GST, VTG)</span>
+                </label>
+                <label class="switch">
+                    <input type="checkbox" id="loggingRinex" name="loggingRinex" />
+                    <span class="switch__label">Generar RINEX automático</span>
+                </label>
+                <label class="switch">
+                    <input type="checkbox" id="loggingRtcm" name="loggingRtcm" />
+                    <span class="switch__label">Guardar flujo RTCM crudo</span>
+                </label>
+                <span class="modal__section-title">Automatización</span>
+                <div class="divider"></div>
+                <label class="switch">
+                    <input type="checkbox" id="loggingAuto" name="loggingAuto" />
+                    <span class="switch__label">Subir automáticamente a la nube</span>
+                </label>
+                <label class="switch">
+                    <input type="checkbox" id="loggingAutoStart" name="loggingAutoStart" />
+                    <span class="switch__label">Iniciar cuando la solución sea RTK Fixed</span>
+                </label>
+                <div class="form__row">
+                    <div class="form__group">
+                        <label class="form__label" for="loggingInterval">Intervalo (s)</label>
+                        <input class="form__input" type="number" min="1" id="loggingInterval" name="loggingInterval" />
+                    </div>
+                    <div class="form__group">
+                        <label class="form__label" for="loggingPath">Almacenamiento</label>
+                        <input class="form__input" id="loggingPath" name="loggingPath" placeholder="/data/gnss/logs" />
+                    </div>
+                </div>
+                <div class="form__group">
+                    <label class="form__label" for="loggingDestination">Destino en la nube</label>
+                    <input class="form__input" id="loggingDestination" name="loggingDestination" placeholder="GNSS Cloud" />
+                </div>
+                <div class="form__group">
+                    <label class="form__label" for="loggingNotes">Notas</label>
+                    <textarea class="form__textarea" id="loggingNotes" name="loggingNotes" placeholder="Observaciones de campo, responsables del respaldo..."></textarea>
+                </div>
+                <div class="modal__footer">
+                    <button type="button" class="ghost-btn" data-modal-close>Cancelar</button>
+                    <button type="submit" class="primary-btn">Guardar perfil</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="modal" id="locationModal" aria-hidden="true">
+        <div class="modal__content">
+            <div class="modal__header">
+                <h2 class="modal__title">Fijar ubicación GNSS</h2>
+                <button class="modal__close" type="button" data-modal-close>
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <form class="form" id="locationForm">
+                <p class="form__hint">Ingresa coordenadas en latitud/longitud o UTM para centrar el mapa y actualizar la solución.</p>
+                <div class="form__row">
+                    <div class="form__group">
+                        <label class="form__label" for="locationLat">Latitud (°)</label>
+                        <input class="form__input" type="number" step="0.000001" id="locationLat" name="locationLat" />
+                    </div>
+                    <div class="form__group">
+                        <label class="form__label" for="locationLon">Longitud (°)</label>
+                        <input class="form__input" type="number" step="0.000001" id="locationLon" name="locationLon" />
+                    </div>
+                    <div class="form__group">
+                        <label class="form__label" for="locationAlt">Altura elipsoidal (m)</label>
+                        <input class="form__input" type="number" step="0.01" id="locationAlt" name="locationAlt" />
+                    </div>
+                </div>
+                <span class="modal__section-title">Coordenadas UTM</span>
+                <div class="divider"></div>
+                <div class="form__row">
+                    <div class="form__group">
+                        <label class="form__label" for="locationZone">Zona</label>
+                        <input class="form__input" type="number" id="locationZone" name="locationZone" min="1" max="60" />
+                    </div>
+                    <div class="form__group">
+                        <label class="form__label" for="locationHemisphere">Hemisferio</label>
+                        <select class="form__select" id="locationHemisphere" name="locationHemisphere">
+                            <option value="N">Norte</option>
+                            <option value="S">Sur</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form__row">
+                    <div class="form__group">
+                        <label class="form__label" for="locationEasting">Este (m)</label>
+                        <input class="form__input" type="number" step="0.01" id="locationEasting" name="locationEasting" />
+                    </div>
+                    <div class="form__group">
+                        <label class="form__label" for="locationNorthing">Norte (m)</label>
+                        <input class="form__input" type="number" step="0.01" id="locationNorthing" name="locationNorthing" />
+                    </div>
+                </div>
+                <p class="form__hint">Completa latitud/longitud o zona, hemisferio, Este y Norte para fijar la posición.</p>
+                <label class="switch">
+                    <input type="checkbox" id="locationLock" name="locationLock" />
+                    <span class="switch__label">Bloquear esta ubicación (detener simulación)</span>
+                </label>
+                <label class="switch">
+                    <input type="checkbox" id="locationUpdateProject" name="locationUpdateProject" />
+                    <span class="switch__label">Actualizar la descripción del proyecto</span>
+                </label>
+                <div class="modal__footer">
+                    <button type="button" class="ghost-btn" data-modal-close>Cancelar</button>
+                    <button type="submit" class="primary-btn">Guardar ubicación</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="modal" id="stakeoutModal" aria-hidden="true">
+        <div class="modal__content">
+            <div class="modal__header">
+                <h2 class="modal__title">Configuración de replanteo</h2>
+                <button class="modal__close" type="button" data-modal-close>
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <form class="form" id="stakeoutForm">
+                <div class="form__group">
+                    <label class="form__label" for="stakeoutPoint">Selecciona un punto guardado</label>
+                    <select class="form__select" id="stakeoutPoint" name="stakeoutPoint"></select>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="stakeoutActive" name="stakeoutActive" />
+                    <span class="switch__label">Activar replanteo con este objetivo</span>
+                </label>
+                <div class="form__row">
+                    <div class="form__group">
+                        <label class="form__label" for="stakeoutTolerance">Tolerancia horizontal (m)</label>
+                        <input class="form__input" type="number" step="0.01" id="stakeoutTolerance" name="stakeoutTolerance" />
+                    </div>
+                    <div class="form__group">
+                        <label class="form__label" for="stakeoutPole">Altura de prisma / varilla (m)</label>
+                        <input class="form__input" type="number" step="0.01" id="stakeoutPole" name="stakeoutPole" />
+                    </div>
+                </div>
+                <span class="modal__section-title">Coordenadas manuales</span>
+                <div class="divider"></div>
+                <div class="form__row">
+                    <div class="form__group">
+                        <label class="form__label" for="stakeoutLat">Latitud</label>
+                        <input class="form__input" type="number" step="0.000001" id="stakeoutLat" name="stakeoutLat" />
+                    </div>
+                    <div class="form__group">
+                        <label class="form__label" for="stakeoutLon">Longitud</label>
+                        <input class="form__input" type="number" step="0.000001" id="stakeoutLon" name="stakeoutLon" />
+                    </div>
+                    <div class="form__group">
+                        <label class="form__label" for="stakeoutAlt">Altura</label>
+                        <input class="form__input" type="number" step="0.01" id="stakeoutAlt" name="stakeoutAlt" />
+                    </div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="stakeoutManual" name="stakeoutManual" />
+                    <span class="switch__label">Usar coordenadas manuales en lugar del punto seleccionado</span>
+                </label>
+                <div class="form__group">
+                    <label class="form__label" for="stakeoutNotes">Instrucciones para la cuadrilla</label>
+                    <textarea class="form__textarea" id="stakeoutNotes" name="stakeoutNotes" placeholder="Ajustar altura de prisma, acercarse por el norte, etc."></textarea>
+                </div>
+                <div class="modal__footer">
+                    <button type="button" class="ghost-btn" data-modal-close>Cancelar</button>
+                    <button type="submit" class="primary-btn">Guardar replanteo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <script type="module">
+const body = document.body;
+const toast = document.getElementById('toast');
+const views = {
+    overview: document.getElementById('overviewView'),
+    survey: document.getElementById('surveyView'),
+    satellites: document.getElementById('satellitesView'),
+    control: document.getElementById('controlView'),
+    files: document.getElementById('filesView')
+};
+
+const STORAGE_KEY = 'gnssai.console.preferences.v1';
+let persistTimer;
+let pendingNtripNotice = null;
+
+function storageAvailable() {
+    try {
+        const testKey = '__gnssai_test__';
+        localStorage.setItem(testKey, '1');
+        localStorage.removeItem(testKey);
+        return true;
+    } catch (error) {
+        console.warn('Persistencia deshabilitada:', error);
+        return false;
+    }
+}
+
+const canPersist = typeof window !== 'undefined' && typeof localStorage !== 'undefined' && storageAvailable();
+
+function readStoredState() {
+    if (!canPersist) return null;
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    try {
+        return JSON.parse(raw);
+    } catch (error) {
+        console.warn('No se pudo parsear el estado guardado', error);
+        return null;
+    }
+}
+
+function writeStoredState() {
+    if (!canPersist) return;
+    const payload = {
+        gnss: {
+            latitude: state.gnss.latitude,
+            longitude: state.gnss.longitude,
+            altitude: state.gnss.altitude,
+            orthometric: state.gnss.orthometric,
+            geoid: state.gnss.geoid,
+            source: state.gnss.source,
+            updatedAt: state.gnss.updatedAt,
+            utm: state.gnss.utm,
+            locked: state.gnss.locked
+        },
+        ntrip: state.ntrip,
+        logging: state.logging,
+        project: state.project,
+        stakeout: state.stakeout,
+        points: state.points,
+        mapLayer: state.mapLayer,
+        photos: state.photos,
+        config: state.config
+    };
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    } catch (error) {
+        console.warn('No se pudo guardar el estado', error);
+    }
+}
+
+function queuePersist() {
+    if (!canPersist) return;
+    clearTimeout(persistTimer);
+    persistTimer = setTimeout(writeStoredState, 250);
+}
+
+function encodeBase64(value) {
+    if (typeof TextEncoder !== 'undefined') {
+        const bytes = new TextEncoder().encode(value);
+        let binary = '';
+        bytes.forEach(byte => {
+            binary += String.fromCharCode(byte);
+        });
+        return btoa(binary);
+    }
+    return btoa(unescape(encodeURIComponent(value)));
+}
+
+function decodeBase64(value) {
+    try {
+        const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+        const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+        const binary = atob(padded);
+        if (typeof TextDecoder !== 'undefined') {
+            const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
+            return new TextDecoder().decode(bytes);
+        }
+        return decodeURIComponent(escape(binary));
+    } catch (error) {
+        console.warn('No se pudo decodificar Base64', error);
+        return null;
+    }
+}
+
+function encodeNtripProfile(profile) {
+    const payload = { ntrip: profile };
+    return encodeBase64(JSON.stringify(payload)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
+}
+
+function decodeNtripPayload(raw) {
+    if (!raw) return null;
+    let token = raw.trim();
+    try {
+        if (/^https?:/.test(token) || token.includes('ntrip=') || token.startsWith('#')) {
+            const virtualUrl = token.startsWith('#') ? new URL(`${window.location.origin}${window.location.pathname}${token}`) : new URL(token, window.location.origin);
+            token = virtualUrl.searchParams.get('ntrip') || new URLSearchParams(virtualUrl.hash.replace('#', '')).get('ntrip') || token;
+        }
+    } catch (error) {
+        console.warn('URL NTRIP inválida', error);
+    }
+    token = token.replace(/[^A-Za-z0-9\-_]/g, '');
+    if (!token) return null;
+    const decoded = decodeBase64(token);
+    if (!decoded) return null;
+    try {
+        const parsed = JSON.parse(decoded);
+        if (parsed && typeof parsed === 'object') {
+            return parsed.ntrip || parsed;
+        }
+    } catch (error) {
+        console.warn('JSON NTRIP inválido', error);
+    }
+    return null;
+}
+
+function sanitizeNtripProfile(profile = state.ntrip) {
+    const {
+        enabled,
+        caster,
+        port,
+        mountpoint,
+        username,
+        password,
+        format,
+        bitrate,
+        latency,
+        ssl,
+        notes
+    } = profile;
+    return {
+        enabled,
+        caster,
+        port,
+        mountpoint,
+        username,
+        password,
+        format,
+        bitrate,
+        latency,
+        ssl,
+        notes
+    };
+}
+
+function buildNtripSharePackage() {
+    const profile = sanitizeNtripProfile();
+    const token = encodeNtripProfile(profile);
+    const url = new URL(window.location.href);
+    url.searchParams.set('ntrip', token);
+    return {
+        profile,
+        token,
+        url: url.toString()
+    };
+}
+
+function copyToClipboard(text, message) {
+    if (!text) return;
+    if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
+        console.warn('API de portapapeles no disponible');
+        if (message) {
+            showToast('Portapapeles no disponible');
+        }
+        return;
+    }
+    navigator.clipboard
+        .writeText(text)
+        .then(() => {
+            if (message) {
+                showToast(message);
+            }
+        })
+        .catch(error => {
+            console.warn('No se pudo copiar al portapapeles', error);
+        });
+}
+
+function applyNtripProfile(data) {
+    if (!data) return false;
+    state.ntrip = { ...state.ntrip, ...data };
+    state.ntrip.lastConnect = data.lastConnect || state.ntrip.lastConnect;
+    queuePersist();
+    updateNtripCard();
+    updateServices();
+    updateStatusCards();
+    populateNtripForm();
+    return true;
+}
+
+function applyNtripFromUrl() {
+    if (typeof window === 'undefined') return;
+    try {
+        const current = new URL(window.location.href);
+        const searchToken = current.searchParams.get('ntrip');
+        const hashParams = new URLSearchParams(current.hash.replace('#', ''));
+        const hashToken = hashParams.get('ntrip');
+        const token = searchToken || hashToken;
+        if (!token) return;
+        const profile = decodeNtripPayload(token);
+        if (applyNtripProfile(profile)) {
+            pendingNtripNotice = 'Perfil NTRIP importado desde enlace';
+        } else {
+            pendingNtripNotice = 'No se pudo importar el perfil NTRIP';
+        }
+        current.searchParams.delete('ntrip');
+        if (hashToken) {
+            hashParams.delete('ntrip');
+            const newHash = hashParams.toString();
+            current.hash = newHash ? `#${newHash}` : '';
+        }
+        window.history.replaceState({}, document.title, `${current.pathname}${current.search}${current.hash}`);
+    } catch (error) {
+        console.warn('No se pudo aplicar NTRIP desde la URL', error);
+    }
+}
+
+const ELLIPSOIDS = {
+    'WGS84': { a: 6378137.0, f: 1 / 298.257223563, label: 'WGS84' },
+    'WGS84-IGN': { a: 6378137.0, f: 1 / 298.257223563, label: 'WGS84-IGN (Perú)' },
+    'SIRGAS2000': { a: 6378137.0, f: 1 / 298.257222101, label: 'SIRGAS2000' },
+    'GRS80': { a: 6378137.0, f: 1 / 298.257222101, label: 'GRS80' },
+    'PSAD56': { a: 6378388.0, f: 1 / 297.0, label: 'PSAD56' }
+};
+
+const PERU_GEOID_REGIONS = {
+    'costa-norte': { name: 'Costa norte', undulation: 29.6 },
+    'costa-centro': { name: 'Costa centro', undulation: 30.8 },
+    'costa-sur': { name: 'Costa sur', undulation: 28.7 },
+    'sierra-norte': { name: 'Sierra norte', undulation: 26.1 },
+    'sierra-centro': { name: 'Sierra centro', undulation: 27.2 },
+    'sierra-sur': { name: 'Sierra sur', undulation: 24.8 },
+    'selva-norte': { name: 'Selva norte', undulation: 33.4 },
+    'selva-centro': { name: 'Selva centro-sur', undulation: 32.6 }
+};
+
+const PERU_GEOID_GRID = [
+    { lat: -2, values: { '-82': 29.4, '-78': 30.9, '-74': 32.7, '-70': 33.9 } },
+    { lat: -6, values: { '-82': 28.9, '-78': 30.3, '-74': 32.1, '-70': 33.2 } },
+    { lat: -10, values: { '-82': 27.6, '-78': 29.1, '-74': 30.7, '-70': 32.2 } },
+    { lat: -14, values: { '-82': 26.4, '-78': 27.9, '-74': 29.3, '-70': 30.6 } },
+    { lat: -18, values: { '-82': 24.8, '-78': 26.3, '-74': 27.7, '-70': 29.1 } }
+];
+
+const DEFAULT_COORDINATE_CONFIG = {
+    projection: 'UTM',
+    ellipsoid: 'WGS84-IGN',
+    geoidModel: 'EGM2008-PERU',
+    customUndulation: null,
+    region: 'auto',
+    zone: null,
+    instrumentHeight: 1.8,
+    referenceVertical: 'EGM2008',
+    autoLock: false
+};
+
+const POINT_FEATURE_STYLES = {
+    control: { stroke: '#ff8a65', fill: '#ffbd80', label: 'Punto de control' },
+    detalle: { stroke: '#32d4ff', fill: '#0ff0b3', label: 'Detalle topográfico' },
+    limite: { stroke: '#ffd166', fill: '#ffe29a', label: 'Límite / lindero' },
+    monumento: { stroke: '#a855f7', fill: '#c084fc', label: 'Monumento' },
+    otro: { stroke: '#5be7a9', fill: '#9af7c4', label: 'Otro' },
+    default: { stroke: '#0ff0b3', fill: '#32d4ff', label: 'Punto GNSS' }
+};
+
+const state = {
+    mode: 'Rover',
+    recording: false,
+    sessionStart: Date.now(),
+    mapLayer: 'hybrid',
+    gnss: {
+        latitude: -9.1904,
+        longitude: -74.99,
+        altitude: 280,
+        orthometric: 250,
+        geoid: 30,
+        horizontalAccuracy: 0.025,
+        hdop: 0.9,
+        satellites: 18,
+        fix: 'Sin solución',
+        age: 2.2,
+        source: 'Simulado',
+        updatedAt: Date.now(),
+        utm: null,
+        locked: false
+    },
+    imu: {
+        tilt: 1.6,
+        heading: 81.2,
+        pitch: 0.5,
+        roll: -0.2,
+        calibrated: true,
+        drift: 0.03,
+        fusion: 'GNSS + IMU'
+    },
+    config: { ...DEFAULT_COORDINATE_CONFIG },
+    services: [
+        { name: 'L-Band PPP', status: 'Sincronizando', tone: 'is-warning' },
+        { name: 'NTRIP Caster', status: 'Correcciones 1.2s', tone: 'is-active' },
+        { name: 'Radio LoRa', status: 'Stand-by', tone: '' },
+        { name: 'Ethernet', status: 'Desconectado', tone: 'is-danger' }
+    ],
+    constellations: [
+        { name: 'GPS', count: 12, snr: 41, color: '#5be7a9' },
+        { name: 'GLONASS', count: 6, snr: 38, color: '#ffc75f' },
+        { name: 'Galileo', count: 5, snr: 44, color: '#32d4ff' },
+        { name: 'BeiDou', count: 4, snr: 37, color: '#ff94d5' }
+    ],
+    satellites: Array.from({ length: 18 }).map((_, i) => ({
+        id: `G${(i + 3).toString().padStart(2, '0')}`,
+        elevation: Math.round(Math.random() * 70 + 10),
+        snr: Math.round(Math.random() * 20 + 35)
+    })),
+    project: {
+        name: 'Proyecto GNSS.AI',
+        location: 'Zona UTM pendiente',
+        owner: 'GNSS.AI Labs',
+        accuracy: '2 cm RMS',
+        code: 'GNSS-000',
+        notes: '',
+        stakeout: {
+            target: '---',
+            distance: 0,
+            bearing: 0
+        }
+    },
+    points: [],
+    events: [
+        { title: 'Correcciones RTCM aplicadas', time: 'Hace 45s' },
+        { title: 'IMU calibrada correctamente', time: 'Hace 3m' },
+        { title: 'Proyecto sincronizado con GNSS Cloud', time: 'Hace 12m' }
+    ],
+    stakeout: {
+        active: false,
+        targetId: null,
+        tolerance: 0.05,
+        poleHeight: 2.0,
+        mode: 'point',
+        manual: null,
+        notes: '',
+        guidance: '',
+        offsets: { north: 0, east: 0, up: 0 }
+    },
+    files: [
+        { name: '2024-02-22_trujillo_session.obs', size: '18.2 MB', time: 'Hace 4 min' },
+        { name: 'projects_backup.json', size: '256 KB', time: 'Hoy 09:00' }
+    ],
+    photos: [],
+    sync: {
+        drive: true,
+        lastSync: 'Hoy · 09:00',
+        pending: 2
+    },
+    ntrip: {
+        enabled: true,
+        caster: 'caster.gnss.ai',
+        port: 2101,
+        mountpoint: 'K922_RT',
+        username: 'gnssai-rover',
+        password: 'K922@field',
+        format: 'RTCM 3.2',
+        bitrate: '56 kbps',
+        latency: 1.2,
+        ssl: true,
+        notes: 'Caster redundante disponible en :2102',
+        lastConnect: 'Hace 45 s'
+    },
+    logging: {
+        nmea: true,
+        rinex: true,
+        rtcm: false,
+        autoUpload: true,
+        autoStart: true,
+        interval: 1,
+        path: '/data/gnss/logs',
+        destination: 'GNSS Cloud',
+        notes: 'Sincronizar al finalizar la jornada',
+        startedAutomatically: false
+    },
+    snrHistory: Array.from({ length: 10 }, (_, i) => ({
+        label: `-${10 - i}s`,
+        gps: 40 + Math.random() * 5,
+        glonass: 35 + Math.random() * 5,
+        galileo: 38 + Math.random() * 5
+    }))
+};
+
+function hydrateFromStorage() {
+    const saved = readStoredState();
+    if (!saved) return;
+    if (saved.gnss) {
+        Object.assign(state.gnss, saved.gnss);
+        if (saved.gnss.utm) {
+            state.gnss.utm = { ...saved.gnss.utm };
+        }
+        if (Number.isFinite(saved.gnss.orthometric)) {
+            state.gnss.orthometric = saved.gnss.orthometric;
+        }
+        if (Number.isFinite(saved.gnss.geoid)) {
+            state.gnss.geoid = saved.gnss.geoid;
+        }
+        state.gnss.source = saved.gnss.source || state.gnss.source;
+        state.gnss.updatedAt = saved.gnss.updatedAt || state.gnss.updatedAt;
+        state.gnss.locked = typeof saved.gnss.locked === 'boolean' ? saved.gnss.locked : state.gnss.locked;
+        if (!state.gnss.updatedAt) {
+            state.gnss.updatedAt = Date.now();
+        }
+    }
+    if (saved.config) {
+        state.config = { ...state.config, ...saved.config };
+    }
+    if (saved.mapLayer) {
+        state.mapLayer = saved.mapLayer;
+    }
+    if (saved.ntrip) {
+        state.ntrip = { ...state.ntrip, ...saved.ntrip };
+    }
+    if (saved.logging) {
+        state.logging = { ...state.logging, ...saved.logging };
+    }
+    if (saved.project) {
+        state.project = { ...state.project, ...saved.project };
+    }
+    if (saved.stakeout) {
+        state.stakeout = { ...state.stakeout, ...saved.stakeout };
+    }
+    if (Array.isArray(saved.points)) {
+        state.points = saved.points.map(point => ({
+            ...point,
+            utm: point.utm ? { ...point.utm } : latLonToUtm(point.lat, point.lon),
+            geoid: Number.isFinite(point.geoid) ? point.geoid : computeGeoidUndulation(point.lat, point.lon),
+            orthometric: Number.isFinite(point.orthometric)
+                ? point.orthometric
+                : computeHeights(point.lat, point.lon, point.alt).orthometric
+        }));
+    }
+    if (Array.isArray(saved.photos)) {
+        state.photos = saved.photos.map(photo => ({
+            ...photo,
+            metadata: {
+                ...photo.metadata,
+                utm: photo.metadata?.utm ? { ...photo.metadata.utm } : photo.metadata?.latitude && photo.metadata?.longitude
+                    ? latLonToUtm(photo.metadata.latitude, photo.metadata.longitude)
+                    : null
+            }
+        }));
+    }
+    if (saved.project?.stakeout) {
+        state.project.stakeout = { ...state.project.stakeout, ...saved.project.stakeout };
+    }
+    refreshGnssDerived();
+}
+
+let map;
+let mapMarker;
+let pointsLayer;
+let hybridLayer;
+let topoLayer;
+let snrChart;
+
+function chartAxisColor() {
+    return body.classList.contains('light') ? 'rgba(26,34,52,0.55)' : 'rgba(255,255,255,0.6)';
+}
+
+function chartGridColor() {
+    return body.classList.contains('light') ? 'rgba(26,34,52,0.08)' : 'rgba(255,255,255,0.1)';
+}
+
+function formatCoord(value) {
+    return `${value.toFixed(7)}°`;
+}
+
+function formatMeters(value, decimals = 2) {
+    return `${value.toFixed(decimals)} m`;
+}
+
+function getEllipsoidParameters(id = state.config?.ellipsoid) {
+    const key = id && ELLIPSOIDS[id] ? id : 'WGS84';
+    return ELLIPSOIDS[key];
+}
+
+function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+}
+
+function approximatePeruGeoid(lat, lon) {
+    const rows = [...PERU_GEOID_GRID].sort((a, b) => b.lat - a.lat);
+    const latValues = rows.map(row => row.lat);
+    const lonKeys = Object.keys(rows[0].values).map(Number).sort((a, b) => a - b);
+    const clampedLat = clamp(lat, latValues[latValues.length - 1], latValues[0]);
+    const clampedLon = clamp(lon, lonKeys[0], lonKeys[lonKeys.length - 1]);
+
+    let upperRow = rows[0];
+    let lowerRow = rows[rows.length - 1];
+    for (let i = 0; i < rows.length - 1; i += 1) {
+        const current = rows[i];
+        const next = rows[i + 1];
+        if (clampedLat <= current.lat && clampedLat >= next.lat) {
+            upperRow = current;
+            lowerRow = next;
+            break;
+        }
+    }
+
+    const lonValues = lonKeys;
+    let leftLon = lonValues[0];
+    let rightLon = lonValues[lonValues.length - 1];
+    for (let i = 0; i < lonValues.length - 1; i += 1) {
+        const current = lonValues[i];
+        const next = lonValues[i + 1];
+        if (clampedLon >= current && clampedLon <= next) {
+            leftLon = current;
+            rightLon = next;
+            break;
+        }
+    }
+
+    const lonRange = rightLon - leftLon || 1;
+    const lonRatio = (clampedLon - leftLon) / lonRange;
+
+    const upperLeft = upperRow.values[leftLon.toString()] ?? 0;
+    const upperRight = upperRow.values[rightLon.toString()] ?? upperLeft;
+    const lowerLeft = lowerRow.values[leftLon.toString()] ?? upperLeft;
+    const lowerRight = lowerRow.values[rightLon.toString()] ?? lowerLeft;
+
+    const geoidUpper = upperLeft + (upperRight - upperLeft) * lonRatio;
+    const geoidLower = lowerLeft + (lowerRight - lowerLeft) * lonRatio;
+
+    const latRange = upperRow.lat - lowerRow.lat || 1;
+    const latRatio = (clampedLat - lowerRow.lat) / latRange;
+
+    return geoidLower + (geoidUpper - geoidLower) * latRatio;
+}
+
+function computeGeoidUndulation(lat, lon) {
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+        return 0;
+    }
+    const config = state.config || DEFAULT_COORDINATE_CONFIG;
+    if (config.geoidModel === 'NONE') {
+        return 0;
+    }
+    if (config.geoidModel === 'CUSTOM' && Number.isFinite(config.customUndulation)) {
+        return config.customUndulation;
+    }
+    if (config.region && config.region !== 'auto' && PERU_GEOID_REGIONS[config.region]) {
+        return PERU_GEOID_REGIONS[config.region].undulation;
+    }
+    const base = approximatePeruGeoid(lat, lon);
+    if (config.geoidModel === 'EGM96') {
+        return base - 0.7;
+    }
+    return base;
+}
+
+function computeHeights(lat, lon, ellipsoidal) {
+    const geoid = computeGeoidUndulation(lat, lon);
+    const orthometric = Number.isFinite(ellipsoidal) ? ellipsoidal - geoid : null;
+    return { geoid, orthometric };
+}
+
+function refreshGnssDerived() {
+    if (!Number.isFinite(state.gnss.latitude) || !Number.isFinite(state.gnss.longitude)) {
+        return;
+    }
+    state.gnss.utm = latLonToUtm(state.gnss.latitude, state.gnss.longitude);
+    const heights = computeHeights(state.gnss.latitude, state.gnss.longitude, state.gnss.altitude);
+    state.gnss.geoid = heights.geoid;
+    state.gnss.orthometric = heights.orthometric;
+}
+
+function formatRelativeTime(timestamp) {
+    if (!Number.isFinite(timestamp)) return '—';
+    const diff = Date.now() - timestamp;
+    if (diff < 0) return 'en curso';
+    const seconds = Math.floor(diff / 1000);
+    if (seconds < 45) return 'hace segundos';
+    if (seconds < 90) return 'hace 1 minuto';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 45) return `hace ${minutes} min`;
+    if (minutes < 90) return 'hace 1 hora';
+    const hours = Math.floor(minutes / 60);
+    if (hours < 22) return `hace ${hours} h`;
+    const days = Math.floor(hours / 24);
+    if (days < 26) return `hace ${days} d`;
+    const date = new Date(timestamp);
+    return date.toLocaleString('es-PE', {
+        hour12: false,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+function formatTimestamp(value) {
+    const date = value ? new Date(value) : null;
+    if (!date || Number.isNaN(date.getTime())) {
+        return '—';
+    }
+    return date.toLocaleString('es-PE', {
+        hour12: false,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+}
+
+function formatExposure(value) {
+    if (!value) return '—';
+    if (value >= 1) {
+        return `${value.toFixed(2)} s`;
+    }
+    const denominator = Math.round(1 / value);
+    return `1/${denominator}`;
+}
+
+function formatFNumber(value) {
+    if (!value) return '—';
+    return `f/${parseFloat(value).toFixed(1)}`;
+}
+
+function formatFocalLength(value) {
+    if (!value) return '—';
+    return `${parseFloat(value).toFixed(1)} mm`;
+}
+
+function formatSpeed(value) {
+    if (!Number.isFinite(value)) return '—';
+    return `${value.toFixed(value >= 10 ? 0 : 2)} m/s`;
+}
+
+function formatBytes(bytes) {
+    if (!Number.isFinite(bytes)) return '—';
+    if (bytes < 1024) return `${bytes} B`;
+    const units = ['KB', 'MB', 'GB'];
+    let value = bytes / 1024;
+    let unit = units.shift();
+    while (value >= 1024 && units.length) {
+        value /= 1024;
+        unit = units.shift();
+    }
+    return `${value.toFixed(value >= 100 ? 0 : 1)} ${unit}`;
+}
+
+function normalizeExifDate(value) {
+    if (!value) return null;
+    if (value instanceof Date) return value.toISOString();
+    if (typeof value === 'number') {
+        return new Date(value).toISOString();
+    }
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        const match = trimmed.match(/^(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
+        if (match) {
+            return `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6]}`;
+        }
+        const parsed = new Date(trimmed);
+        if (!Number.isNaN(parsed.getTime())) {
+            return parsed.toISOString();
+        }
+    }
+    return null;
+}
+
+function showToast(message) {
+    toast.textContent = message;
+    toast.classList.add('is-visible');
+    clearTimeout(showToast.timeout);
+    showToast.timeout = setTimeout(() => {
+        toast.classList.remove('is-visible');
+    }, 2500);
+}
+
+function updateRecordingButtons() {
+    const label = state.recording
+        ? '<i data-lucide="pause"></i><span>Detener registro</span>'
+        : '<i data-lucide="radio"></i><span>Iniciar registro</span>';
+    const recordBtn = document.getElementById('recordBtn');
+    const mobileRecordBtn = document.getElementById('mobileRecordBtn');
+    if (recordBtn) {
+        recordBtn.innerHTML = label;
+    }
+    if (mobileRecordBtn) {
+        mobileRecordBtn.innerHTML = label;
+    }
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
+}
+
+function openModal(id) {
+    const modal = document.getElementById(id);
+    if (!modal) return;
+    modal.classList.add('is-open');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    const focusable = modal.querySelector('input, select, textarea, button');
+    if (focusable) {
+        setTimeout(() => focusable.focus(), 60);
+    }
+}
+
+function closeModal(target) {
+    const modal = typeof target === 'string' ? document.getElementById(target) : target;
+    if (!modal) return;
+    modal.classList.remove('is-open');
+    modal.setAttribute('aria-hidden', 'true');
+    if (!document.querySelector('.modal.is-open')) {
+        document.body.style.overflow = '';
+    }
+}
+
+function setupModals() {
+    document.querySelectorAll('[data-modal-close]').forEach(button => {
+        button.addEventListener('click', () => {
+            const modal = button.closest('.modal');
+            closeModal(modal);
+        });
+    });
+
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.addEventListener('click', event => {
+            if (event.target === modal) {
+                closeModal(modal);
+            }
+        });
+    });
+
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape') {
+            const open = document.querySelector('.modal.is-open');
+            if (open) closeModal(open);
+        }
+    });
+}
+
+function maskPassword(value) {
+    if (!value) return 'No asignada';
+    return '•'.repeat(Math.max(value.length, 6));
+}
+
+function updateSessionTimer() {
+    const sessionEl = document.querySelector('#sessionInfo .session__value');
+    const elapsed = Math.floor((Date.now() - state.sessionStart) / 1000);
+    const hours = String(Math.floor(elapsed / 3600)).padStart(2, '0');
+    const minutes = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
+    const seconds = String(elapsed % 60).padStart(2, '0');
+    sessionEl.textContent = `${hours}:${minutes}:${seconds}`;
+}
+
+function updateStatusCards() {
+    const { gnss } = state;
+    document.querySelector('#gnssStatus .status-card__value').textContent = `${gnss.satellites} sats`;
+    document.querySelector('#rtkStatus .status-card__value').textContent = gnss.fix;
+    document.querySelector('#imuStatus .status-card__value').textContent = state.imu.calibrated ? 'Activo' : 'Calibrando';
+    document.querySelector('#networkStatus .status-card__value').textContent = state.ntrip.enabled
+        ? `Correcciones ${state.ntrip.latency.toFixed(1)}s`
+        : 'Desconectado';
+
+    document.querySelectorAll('.status-card').forEach(card => card.classList.remove('is-active'));
+    if (gnss.fix.toLowerCase() === 'rtk fixed') {
+        document.getElementById('rtkStatus').classList.add('is-active');
+    }
+}
+
+function updateSolution() {
+    const { gnss } = state;
+    refreshGnssDerived();
+    document.getElementById('solutionSubtitle').textContent = gnss.fix === 'Sin solución'
+        ? 'Esperando posicionamiento RTK'
+        : `Precisión ${formatMeters(gnss.horizontalAccuracy * 100)} · Edad ${gnss.age.toFixed(1)}s`;
+    document.getElementById('latLon').textContent = `${formatCoord(gnss.latitude)}, ${formatCoord(gnss.longitude)}`;
+    const ellipsoidLabel = document.getElementById('altitudeEllipsoidal');
+    if (ellipsoidLabel) {
+        ellipsoidLabel.textContent = `Altitud elipsoidal ${formatMeters(gnss.altitude)}`;
+    }
+    const orthometricLabel = document.getElementById('altitudeOrthometric');
+    if (orthometricLabel) {
+        orthometricLabel.textContent = Number.isFinite(gnss.orthometric)
+            ? `Altura ortométrica ${formatMeters(gnss.orthometric)}`
+            : 'Altura ortométrica —';
+    }
+    const geoidLabel = document.getElementById('geoidInfo');
+    if (geoidLabel) {
+        const modelLabel =
+            state.config.geoidModel === 'EGM2008-PERU'
+                ? 'EGM2008 Perú'
+                : state.config.geoidModel === 'EGM96'
+                ? 'EGM96'
+                : state.config.geoidModel === 'NONE'
+                ? 'Sin corrección'
+                : state.config.geoidModel === 'CUSTOM'
+                ? 'Geoid personalizado'
+                : state.config.geoidModel || 'EGM2008';
+        geoidLabel.textContent = `Geoid ${modelLabel}: N = ${Number.isFinite(gnss.geoid) ? `${gnss.geoid.toFixed(2)} m` : '—'}`;
+    }
+    document.getElementById('hAccuracy').textContent = `${(gnss.horizontalAccuracy * 100).toFixed(1)} cm`;
+    document.getElementById('hdop').textContent = gnss.hdop.toFixed(1);
+    document.getElementById('satCount').textContent = gnss.satellites;
+    document.getElementById('correctionAge').textContent = `${gnss.age.toFixed(1)} s`;
+    const utm = gnss.utm || latLonToUtm(gnss.latitude, gnss.longitude);
+    state.gnss.utm = utm;
+    const zoneLabel = `${utm.zone}${utm.band}${utm.hemisphere}`;
+    const utmZone = document.getElementById('utmZone');
+    if (utmZone) {
+        utmZone.textContent = zoneLabel;
+    }
+    const utmCoords = document.getElementById('utmEN');
+    if (utmCoords) {
+        utmCoords.textContent = `${utm.easting.toFixed(3)} E · ${utm.northing.toFixed(3)} N`;
+    }
+    const sourceEl = document.getElementById('positionSource');
+    if (sourceEl) {
+        sourceEl.textContent = gnss.source || 'Simulado';
+    }
+    const updatedEl = document.getElementById('positionUpdated');
+    if (updatedEl) {
+        updatedEl.textContent = `${gnss.locked ? 'Fijado' : 'Automático'} · ${formatRelativeTime(gnss.updatedAt || Date.now())}`;
+    }
+    updateCoordinateCard();
+}
+
+function updateConstellations() {
+    const list = document.getElementById('constellationsList');
+    list.innerHTML = '';
+    state.constellations.forEach(constellation => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+            <span>${constellation.name}</span>
+            <div class="constellation__metrics">
+                <span>${constellation.count} satélites</span>
+                <span>${constellation.snr} dBHz</span>
+            </div>`;
+        li.style.setProperty('--tone', constellation.color);
+        list.appendChild(li);
+    });
+}
+
+function updateServices() {
+    const list = document.getElementById('servicesList');
+    list.innerHTML = '';
+    const ntripService = state.services.find(service => service.name.includes('NTRIP'));
+    if (ntripService) {
+        ntripService.status = state.ntrip.enabled
+            ? `Correcciones ${state.ntrip.latency.toFixed(1)}s`
+            : 'NTRIP desconectado';
+        ntripService.tone = state.ntrip.enabled ? 'is-active' : 'is-danger';
+    }
+    state.services.forEach(service => {
+        const li = document.createElement('li');
+        if (service.tone) li.classList.add(service.tone);
+        li.innerHTML = `
+            <span>${service.name}</span>
+            <span>${service.status}</span>`;
+        list.appendChild(li);
+    });
+}
+
+function updateImu() {
+    const container = document.getElementById('imuStats');
+    container.innerHTML = '';
+    const entries = [
+        { label: 'Tilt', value: `${state.imu.tilt.toFixed(1)}°` },
+        { label: 'Heading', value: `${state.imu.heading.toFixed(1)}°` },
+        { label: 'Pitch', value: `${state.imu.pitch.toFixed(1)}°` },
+        { label: 'Roll', value: `${state.imu.roll.toFixed(1)}°` },
+        { label: 'Drift', value: `${state.imu.drift.toFixed(2)}°/h` },
+        { label: 'Fusión', value: state.imu.fusion }
+    ];
+
+    entries.forEach(entry => {
+        const group = document.createElement('div');
+        group.innerHTML = `<dt>${entry.label}</dt><dd>${entry.value}</dd>`;
+        container.appendChild(group);
+    });
+}
+
+function updateTimeline() {
+    const list = document.getElementById('timeline');
+    list.innerHTML = '';
+    state.events.forEach(event => {
+        const li = document.createElement('li');
+        li.innerHTML = `<strong>${event.title}</strong><time>${event.time}</time>`;
+        list.appendChild(li);
+    });
+}
+
+function updateProject() {
+    const summary = document.getElementById('projectSummary');
+    const notes = state.project.notes || 'Sin notas registradas';
+    const stakeout = state.project.stakeout || { target: '---', distance: 0, bearing: 0 };
+    const utm = state.gnss.utm || (Number.isFinite(state.gnss.latitude) ? latLonToUtm(state.gnss.latitude, state.gnss.longitude) : null);
+    const zoneLabel = utm ? `Zona UTM ${utm.zone}${utm.band}${utm.hemisphere}` : state.project.location;
+    if (utm) {
+        state.project.location = zoneLabel;
+    }
+    const ellipsoid = getEllipsoidParameters();
+    const geoidLabel = describeGeoid();
+    summary.innerHTML = `
+        <div class="project__header">
+            <div>
+                <h3>${state.project.name}</h3>
+                <p>${zoneLabel}</p>
+            </div>
+            <span class="badge">Precisión ${state.project.accuracy}</span>
+        </div>
+        <div class="project__details">
+            <p><strong>Responsable:</strong> ${state.project.owner}</p>
+            <p><strong>Código:</strong> ${state.project.code || 'Sin código'}</p>
+            <p><strong>Stakeout:</strong> ${stakeout.target} · ${stakeout.distance.toFixed(2)} m · ${Math.round(stakeout.bearing)}°</p>
+            <p><strong>Datum:</strong> ${state.config.projection} · ${ellipsoid.label} · ${geoidLabel}</p>
+            <p><strong>Notas:</strong> ${notes}</p>
+        </div>`;
+}
+
+function getNextPointName() {
+    const regex = /^P-(\d{1,})$/i;
+    const maxId = state.points.reduce((acc, point) => {
+        const match = regex.exec(point.name || '');
+        if (match) {
+            const value = parseInt(match[1], 10);
+            return Math.max(acc, value);
+        }
+        return acc;
+    }, 20);
+    return `P-${String(maxId + 1).padStart(3, '0')}`;
+}
+
+function updatePoints() {
+    const tbody = document.querySelector('#pointsTable tbody');
+    tbody.innerHTML = '';
+    state.points.forEach(point => {
+        if (!point.utm) {
+            point.utm = latLonToUtm(point.lat, point.lon);
+        }
+        if (!Number.isFinite(point.geoid) || !Number.isFinite(point.orthometric)) {
+            const heights = computeHeights(point.lat, point.lon, point.alt);
+            point.geoid = heights.geoid;
+            point.orthometric = heights.orthometric;
+        }
+        const utm = point.utm;
+        const row = document.createElement('tr');
+        row.dataset.pointId = point.name;
+        row.innerHTML = `
+            <td>${point.name}</td>
+            <td class="is-utm">${utm.zone}${utm.band}${utm.hemisphere}</td>
+            <td class="is-utm">${utm.easting.toFixed(2)}</td>
+            <td class="is-utm">${utm.northing.toFixed(2)}</td>
+            <td class="is-subtle">${point.lat.toFixed(6)}</td>
+            <td class="is-subtle">${point.lon.toFixed(6)}</td>
+            <td>${point.alt.toFixed(2)}</td>
+            <td>${Number.isFinite(point.orthometric) ? point.orthometric.toFixed(2) : '—'}</td>
+            <td>${(point.accuracy * 100).toFixed(1)} cm</td>
+            <td>${point.date}</td>`;
+        tbody.appendChild(row);
+    });
+    renderPointsOnMap();
+}
+
+function renderPointsOnMap() {
+    if (!map || !pointsLayer) return;
+    pointsLayer.clearLayers();
+    state.points.forEach(point => {
+        if (!Number.isFinite(point.lat) || !Number.isFinite(point.lon)) return;
+        const style = POINT_FEATURE_STYLES[point.feature] || POINT_FEATURE_STYLES.default;
+        const marker = L.circleMarker([point.lat, point.lon], {
+            radius: 7,
+            color: style.stroke,
+            fillColor: style.fill,
+            fillOpacity: 0.9,
+            weight: 2
+        });
+        const utm = point.utm || latLonToUtm(point.lat, point.lon);
+        const featureLabel = style.label || 'Punto GNSS';
+        const description = point.description ? `<span>${point.description}</span>` : '';
+        const attributes = point.attributes ? `<span class="map-point-tags">${point.attributes}</span>` : '';
+        const notes = point.notes ? `<span>${point.notes}</span>` : '';
+        const accuracy = Number.isFinite(point.accuracy) ? `${(point.accuracy * 100).toFixed(1)} cm` : '—';
+        const popup = `
+            <div class="map-point-popup">
+                <strong>${point.name}</strong>
+                <span>${featureLabel}</span>
+                <span>${utm.zone}${utm.band}${utm.hemisphere} · ${utm.easting.toFixed(2)}E / ${utm.northing.toFixed(2)}N</span>
+                <span>Alt elip: ${point.alt.toFixed(2)} m · Alt ortom: ${Number.isFinite(point.orthometric) ? point.orthometric.toFixed(2) : '—'} m</span>
+                ${description}
+                ${attributes}
+                ${notes}
+                <span>Precisión ${accuracy} · ${point.date}</span>
+            </div>`;
+        marker.bindPopup(popup);
+        marker.bindTooltip(point.name, { direction: 'top', offset: [0, -8] });
+        pointsLayer.addLayer(marker);
+    });
+}
+
+function formatOffset(value) {
+    const sign = value > 0 ? '+' : '';
+    return `${sign}${value.toFixed(2)} m`;
+}
+
+function describeOffset(axis, value) {
+    const magnitude = Math.abs(value);
+    if (axis === 'N') {
+        if (magnitude < 0.01) return 'Perfecto en Norte';
+        return value >= 0 ? 'Avanza hacia el norte' : 'Retrocede hacia el sur';
+    }
+    if (axis === 'E') {
+        if (magnitude < 0.01) return 'Perfecto en Este';
+        return value >= 0 ? 'Desplázate al este' : 'Desplázate al oeste';
+    }
+    if (axis === 'Z') {
+        if (magnitude < 0.01) return 'Altura correcta';
+        return value >= 0 ? 'Sube la antena' : 'Baja la antena';
+    }
+    return `${magnitude.toFixed(2)} m`;
+}
+
+function toRadians(value) {
+    return (value * Math.PI) / 180;
+}
+
+function latToUtmBand(lat) {
+    const bands = 'CDEFGHJKLMNPQRSTUVWX';
+    const index = Math.floor((lat + 80) / 8);
+    if (index < 0) return 'C';
+    if (index >= bands.length) return 'X';
+    return bands[index];
+}
+
+function latLonToUtm(lat, lon, ellipsoidId = state.config?.ellipsoid) {
+    const { a, f } = getEllipsoidParameters(ellipsoidId);
+    const k0 = 0.9996;
+    const eSq = f * (2 - f);
+    const e = Math.sqrt(eSq);
+    const latRad = toRadians(lat);
+    const lonRad = toRadians(lon);
+    let zone = Math.floor((lon + 180) / 6) + 1;
+
+    if (lat >= 56 && lat < 64 && lon >= 3 && lon < 12) zone = 32;
+    if (lat >= 72 && lat < 84) {
+        if (lon >= 0 && lon < 9) zone = 31;
+        else if (lon >= 9 && lon < 21) zone = 33;
+        else if (lon >= 21 && lon < 33) zone = 35;
+        else if (lon >= 33 && lon < 42) zone = 37;
+    }
+
+    const overrideZone = Number.isFinite(state.config?.zone)
+        ? Math.min(Math.max(Math.round(state.config.zone), 1), 60)
+        : null;
+    if (overrideZone) {
+        zone = overrideZone;
+    }
+
+    const lonOrigin = (zone - 1) * 6 - 180 + 3;
+    const lonOriginRad = toRadians(lonOrigin);
+    const ePrimeSq = eSq / (1 - eSq);
+    const sinLat = Math.sin(latRad);
+    const cosLat = Math.cos(latRad);
+    const tanLat = Math.tan(latRad);
+    const N = a / Math.sqrt(1 - eSq * sinLat ** 2);
+    const T = tanLat ** 2;
+    const C = ePrimeSq * cosLat ** 2;
+    const A = cosLat * (lonRad - lonOriginRad);
+
+    const M =
+        a *
+        ((1 - eSq / 4 - (3 * eSq ** 2) / 64 - (5 * eSq ** 3) / 256) * latRad -
+            ((3 * eSq) / 8 + (3 * eSq ** 2) / 32 + (45 * eSq ** 3) / 1024) * Math.sin(2 * latRad) +
+            ((15 * eSq ** 2) / 256 + (45 * eSq ** 3) / 1024) * Math.sin(4 * latRad) -
+            ((35 * eSq ** 3) / 3072) * Math.sin(6 * latRad));
+
+    const easting =
+        k0 *
+            N *
+            (A + ((1 - T + C) * A ** 3) / 6 + ((5 - 18 * T + T ** 2 + 72 * C - 58 * ePrimeSq) * A ** 5) / 120) +
+        500000;
+    let northing =
+        k0 *
+        (M +
+            N *
+                tanLat *
+                (A ** 2 / 2 + ((5 - T + 9 * C + 4 * C ** 2) * A ** 4) / 24 + ((61 - 58 * T + T ** 2 + 600 * C - 330 * ePrimeSq) * A ** 6) / 720));
+
+    const hemisphere = lat >= 0 ? 'N' : 'S';
+    if (lat < 0) {
+        northing += 10000000;
+    }
+
+    return {
+        zone,
+        hemisphere,
+        band: latToUtmBand(lat),
+        easting,
+        northing
+    };
+}
+
+function utmToLatLon({ zone, hemisphere, easting, northing }, ellipsoidId = state.config?.ellipsoid) {
+    if (!Number.isFinite(zone) || !Number.isFinite(easting) || !Number.isFinite(northing)) {
+        return null;
+    }
+    const { a, f } = getEllipsoidParameters(ellipsoidId);
+    const k0 = 0.9996;
+    const eSq = f * (2 - f);
+    const e = Math.sqrt(eSq);
+    const ePrimeSq = eSq / (1 - eSq);
+    const x = easting - 500000;
+    let y = northing;
+    const hemisphereUpper = (hemisphere || 'N').toUpperCase();
+    if (hemisphereUpper === 'S') {
+        y -= 10000000;
+    }
+    const m = y / k0;
+    const mu =
+        m /
+        (a * (1 - eSq / 4 - (3 * eSq ** 2) / 64 - (5 * eSq ** 3) / 256));
+    const e1 = (1 - Math.sqrt(1 - eSq)) / (1 + Math.sqrt(1 - eSq));
+    const j1 = (3 * e1) / 2 - (27 * e1 ** 3) / 32;
+    const j2 = (21 * e1 ** 2) / 16 - (55 * e1 ** 4) / 32;
+    const j3 = (151 * e1 ** 3) / 96;
+    const j4 = (1097 * e1 ** 4) / 512;
+    const phi1 =
+        mu +
+        j1 * Math.sin(2 * mu) +
+        j2 * Math.sin(4 * mu) +
+        j3 * Math.sin(6 * mu) +
+        j4 * Math.sin(8 * mu);
+    const sinPhi1 = Math.sin(phi1);
+    const cosPhi1 = Math.cos(phi1);
+    const tanPhi1 = Math.tan(phi1);
+    const n1 = a / Math.sqrt(1 - eSq * sinPhi1 ** 2);
+    const r1 = (a * (1 - eSq)) / Math.pow(1 - eSq * sinPhi1 ** 2, 1.5);
+    const t1 = tanPhi1 ** 2;
+    const c1 = ePrimeSq * cosPhi1 ** 2;
+    const d = x / (n1 * k0);
+    const lat =
+        phi1 -
+        (n1 * tanPhi1) /
+            r1 *
+            (d ** 2 / 2 -
+                ((5 + 3 * t1 + 10 * c1 - 4 * c1 ** 2 - 9 * ePrimeSq) * d ** 4) / 24 +
+                ((61 + 90 * t1 + 298 * c1 + 45 * t1 ** 2 - 252 * ePrimeSq - 3 * c1 ** 2) * d ** 6) / 720);
+    const lon =
+        (d -
+            ((1 + 2 * t1 + c1) * d ** 3) / 6 +
+            ((5 - 2 * c1 + 28 * t1 - 3 * c1 ** 2 + 8 * ePrimeSq + 24 * t1 ** 2) * d ** 5) / 120) /
+        cosPhi1;
+    const lonOrigin = (zone - 1) * 6 - 180 + 3;
+    const latitude = (lat * 180) / Math.PI;
+    const longitude = lonOrigin + (lon * 180) / Math.PI;
+    return {
+        latitude,
+        longitude,
+        utm: {
+            zone,
+            hemisphere: hemisphereUpper === 'S' ? 'S' : 'N',
+            band: latToUtmBand(latitude),
+            easting,
+            northing
+        }
+    };
+}
+
+function calculateOffsets(current, target) {
+    const targetLat = target.lat ?? target.latitude ?? current.latitude;
+    const targetLon = target.lon ?? target.longitude ?? current.longitude;
+    const altitude = (target.alt ?? target.altitude ?? current.altitude) - current.altitude;
+    const currentUtm = latLonToUtm(current.latitude, current.longitude);
+    const targetUtm = target.utm || latLonToUtm(targetLat, targetLon);
+    if (!target.utm) {
+        target.utm = targetUtm;
+    }
+    return {
+        north: targetUtm.northing - currentUtm.northing,
+        east: targetUtm.easting - currentUtm.easting,
+        up: altitude
+    };
+}
+
+function updateStakeoutPanel() {
+    const panel = document.getElementById('stakeoutPanel');
+    if (!panel) return;
+    const subtitle = document.getElementById('stakeoutSubtitle');
+
+    if (!state.stakeout.active) {
+        panel.classList.add('is-idle');
+        panel.innerHTML = `
+            <p class="modal__hint">El replanteo está desactivado.</p>
+            <p class="modal__hint">Usa “Configurar” para elegir un punto o ingresar coordenadas.</p>`;
+        if (subtitle) {
+            subtitle.textContent = 'Replanteo desactivado';
+        }
+        state.project.stakeout = { target: '—', distance: 0, bearing: 0 };
+        updateProject();
+        return;
+    }
+
+    let target = null;
+    if (state.stakeout.mode === 'manual' && state.stakeout.manual) {
+        target = state.stakeout.manual;
+    } else if (state.stakeout.targetId) {
+        target = state.points.find(point => point.name === state.stakeout.targetId) || null;
+    }
+
+    if (!target) {
+        panel.classList.add('is-idle');
+        panel.innerHTML = '<p class="modal__hint">No se encontró el punto seleccionado. Configura nuevamente el replanteo.</p>';
+        if (subtitle) {
+            subtitle.textContent = 'Punto no disponible';
+        }
+        state.project.stakeout = { target: '—', distance: 0, bearing: 0 };
+        updateProject();
+        return;
+    }
+
+    panel.classList.remove('is-idle');
+    if (!target.utm) {
+        target.utm = latLonToUtm(target.lat ?? target.latitude, target.lon ?? target.longitude);
+    }
+    const offsets = calculateOffsets(state.gnss, target);
+    state.stakeout.offsets = offsets;
+    const distance = Math.sqrt(offsets.north ** 2 + offsets.east ** 2);
+    const bearing = (Math.atan2(offsets.east, offsets.north) * 180) / Math.PI;
+    const normalizedBearing = (bearing + 360) % 360;
+    const withinTolerance = distance <= state.stakeout.tolerance;
+    const guidance = state.stakeout.guidance || (withinTolerance ? 'Objetivo dentro de tolerancia.' : 'Ajusta desplazamiento hasta cumplir la tolerancia.');
+    const currentUtm = latLonToUtm(state.gnss.latitude, state.gnss.longitude);
+
+    state.project.stakeout = {
+        target: state.stakeout.mode === 'manual' ? (state.stakeout.targetId || 'Manual') : state.stakeout.targetId,
+        distance,
+        bearing: normalizedBearing
+    };
+
+    const badgeTone = withinTolerance ? 'is-success' : 'is-warning';
+    const renderVector = (axis, value) => {
+        const tone = value > 0.02 ? 'is-positive' : value < -0.02 ? 'is-negative' : 'is-neutral';
+        return `
+            <div class="stakeout__vector ${tone}">
+                <span>${axis}</span>
+                <strong>${formatOffset(value)}</strong>
+                <small>${describeOffset(axis, value)}</small>
+            </div>`;
+    };
+
+    panel.innerHTML = `
+        <div class="stakeout__status">
+            <span class="badge ${badgeTone}">${state.project.stakeout.target}</span>
+            <dl>
+                <div>
+                    <dt>Distancia</dt>
+                    <dd>${distance.toFixed(3)} m</dd>
+                </div>
+                <div>
+                    <dt>Rumbo</dt>
+                    <dd>${normalizedBearing.toFixed(1)}°</dd>
+                </div>
+                <div>
+                    <dt>Tolerancia</dt>
+                    <dd>${state.stakeout.tolerance.toFixed(2)} m</dd>
+                </div>
+            </dl>
+        </div>
+        <div class="stakeout__vectors">
+            ${renderVector('N', offsets.north)}
+            ${renderVector('E', offsets.east)}
+            ${renderVector('Z', offsets.up)}
+        </div>
+        <div class="stakeout__utm">
+            <div>
+                <span>UTM objetivo</span>
+                <strong>${target.utm.zone}${target.utm.band}${target.utm.hemisphere}</strong>
+                <p>${target.utm.easting.toFixed(2)} E · ${target.utm.northing.toFixed(2)} N</p>
+            </div>
+            <div>
+                <span>UTM equipo</span>
+                <strong>${currentUtm.zone}${currentUtm.band}${currentUtm.hemisphere}</strong>
+                <p>${currentUtm.easting.toFixed(2)} E · ${currentUtm.northing.toFixed(2)} N</p>
+            </div>
+        </div>
+        <p class="stakeout__guidance ${withinTolerance ? 'is-success' : 'is-warning'}">${guidance}</p>`;
+
+    if (subtitle) {
+        subtitle.textContent = state.stakeout.mode === 'manual' ? 'Objetivo manual activado' : `Replanteando ${state.stakeout.targetId}`;
+    }
+    updateProject();
+}
+
+function updateNtripCard() {
+    const summary = document.getElementById('ntripSummary');
+    if (!summary) return;
+    summary.innerHTML = `
+        <div class="ntrip__item"><span>Estado</span><span class="ntrip__badge">${state.ntrip.enabled ? 'Activo' : 'Detenido'}</span></div>
+        <div class="ntrip__item"><span>Caster</span><strong>${state.ntrip.caster}:${state.ntrip.port}</strong></div>
+        <div class="ntrip__item"><span>Mountpoint</span><strong>${state.ntrip.mountpoint}</strong></div>
+        <div class="ntrip__item"><span>Credenciales</span><strong>${state.ntrip.username || '—'} / ${maskPassword(state.ntrip.password)}</strong></div>
+        <div class="ntrip__item"><span>Formato</span><strong>${state.ntrip.format} · ${state.ntrip.bitrate}</strong></div>
+        <div class="ntrip__item"><span>Latencia</span><strong>${state.ntrip.enabled ? `${state.ntrip.latency.toFixed(1)} s` : '--'}</strong></div>
+        <div class="ntrip__item"><span>Notas</span><strong>${state.ntrip.notes || 'Sin notas'}</strong></div>`;
+}
+
+function updateLoggingCard() {
+    const container = document.getElementById('loggingCard');
+    if (!container) return;
+    const formats = [];
+    if (state.logging.nmea) formats.push('<span class="tag">NMEA</span>');
+    if (state.logging.rinex) formats.push('<span class="tag">RINEX</span>');
+    if (state.logging.rtcm) formats.push('<span class="tag tag--alt">RTCM</span>');
+
+    container.innerHTML = `
+        <div class="logging-card__row"><span>Formatos</span><div class="logging-card__tags">${formats.join('') || '<span class="modal__hint">Sin formatos</span>'}</div></div>
+        <div class="logging-card__row"><span>Intervalo</span><strong>${state.logging.interval} s</strong></div>
+        <div class="logging-card__row"><span>Destino</span><strong>${state.logging.destination}</strong></div>
+        <div class="logging-card__row"><span>Ruta</span><strong>${state.logging.path}</strong></div>
+        <div class="logging-card__row"><span>Estado</span><strong>${state.recording ? 'Grabando' : 'En espera'}${state.logging.autoUpload ? ' · Auto-sync' : ''}</strong></div>
+        <p class="modal__hint">${state.logging.notes || 'Sin notas adicionales'}</p>`;
+}
+
+function updateLoggingSummary() {
+    const summary = document.getElementById('loggingSummary');
+    if (!summary) return;
+    const formats = ['NMEA', 'RINEX', 'RTCM'].filter((format, index) => {
+        if (format === 'NMEA') return state.logging.nmea;
+        if (format === 'RINEX') return state.logging.rinex;
+        if (format === 'RTCM') return state.logging.rtcm;
+        return false;
+    });
+    const joined = formats.length ? formats.join(' + ') : 'Sin formatos';
+    summary.innerHTML = `
+        <strong>Perfil activo:</strong>
+        ${joined} · ${state.logging.interval} s<br>
+        ${state.recording ? 'Grabación en curso' : 'Listo para iniciar'}${state.logging.autoUpload ? ' · Auto-sync' : ''}`;
+}
+
+function populateProjectForm() {
+    const form = document.getElementById('projectForm');
+    if (!form) return;
+    form.projectName.value = state.project.name;
+    form.projectLocation.value = state.project.location;
+    form.projectOwner.value = state.project.owner;
+    form.projectAccuracy.value = state.project.accuracy;
+    form.projectCode.value = state.project.code || '';
+    form.projectNotes.value = state.project.notes || '';
+    form.stakeoutTarget.value = state.project.stakeout?.target || '';
+    form.stakeoutDistance.value = state.project.stakeout?.distance ? state.project.stakeout.distance.toFixed(2) : '';
+    form.stakeoutBearing.value = state.project.stakeout?.bearing ?? '';
+    form.projectReset.checked = false;
+}
+
+function populateNtripForm() {
+    const form = document.getElementById('ntripForm');
+    if (!form) return;
+    form.ntripEnabled.checked = !!state.ntrip.enabled;
+    form.ntripCaster.value = state.ntrip.caster || '';
+    form.ntripPort.value = state.ntrip.port || '';
+    form.ntripMountpoint.value = state.ntrip.mountpoint || '';
+    form.ntripFormat.value = state.ntrip.format || 'RTCM 3.2';
+    form.ntripUser.value = state.ntrip.username || '';
+    form.ntripPass.value = state.ntrip.password || '';
+    form.ntripBitrate.value = state.ntrip.bitrate || '';
+    form.ntripLatency.value = state.ntrip.latency ? state.ntrip.latency.toFixed(1) : '';
+    form.ntripSsl.checked = !!state.ntrip.ssl;
+    form.ntripNotes.value = state.ntrip.notes || '';
+}
+
+function populateLoggingForm() {
+    const form = document.getElementById('loggingForm');
+    if (!form) return;
+    form.loggingNmea.checked = !!state.logging.nmea;
+    form.loggingRinex.checked = !!state.logging.rinex;
+    form.loggingRtcm.checked = !!state.logging.rtcm;
+    form.loggingAuto.checked = !!state.logging.autoUpload;
+    form.loggingAutoStart.checked = !!state.logging.autoStart;
+    form.loggingInterval.value = state.logging.interval;
+    form.loggingPath.value = state.logging.path;
+    form.loggingDestination.value = state.logging.destination;
+    form.loggingNotes.value = state.logging.notes || '';
+
+    const storageBadge = document.getElementById('loggingStorageBadge');
+    const autoBadge = document.getElementById('loggingAutoBadge');
+    if (storageBadge) {
+        storageBadge.textContent = `Ruta local: ${state.logging.path}`;
+    }
+    if (autoBadge) {
+        autoBadge.textContent = state.logging.autoUpload ? 'Auto-subida activa' : 'Sin sincronización automática';
+        autoBadge.classList.toggle('tag--success', state.logging.autoUpload);
+        autoBadge.classList.toggle('tag--alt', !state.logging.autoUpload);
+    }
+}
+
+function describeGeoid(config = state.config) {
+    if (!config) return 'Sin corrección';
+    if (config.geoidModel === 'EGM2008-PERU') {
+        const region = config.region && config.region !== 'auto' && PERU_GEOID_REGIONS[config.region]
+            ? PERU_GEOID_REGIONS[config.region].name
+            : 'Auto Perú';
+        return `EGM2008 Perú · ${region}`;
+    }
+    if (config.geoidModel === 'EGM96') {
+        return 'EGM96 Global';
+    }
+    if (config.geoidModel === 'CUSTOM') {
+        return Number.isFinite(config.customUndulation)
+            ? `Geoid personalizado · N=${config.customUndulation.toFixed(2)} m`
+            : 'Geoid personalizado';
+    }
+    if (config.geoidModel === 'NONE') {
+        return 'Sin corrección geoidal';
+    }
+    return config.geoidModel || 'EGM2008';
+}
+
+function updateCoordinateCard() {
+    const card = document.getElementById('coordinateCard');
+    if (!card) return;
+    const config = state.config || DEFAULT_COORDINATE_CONFIG;
+    const ellipsoid = getEllipsoidParameters(config.ellipsoid);
+    const hasLatLon = Number.isFinite(state.gnss.latitude) && Number.isFinite(state.gnss.longitude);
+    const utm = hasLatLon
+        ? state.gnss.utm || latLonToUtm(state.gnss.latitude, state.gnss.longitude)
+        : state.gnss.utm;
+    const zoneInfo = config.projection === 'UTM'
+        ? (() => {
+              if (!utm) return 'Auto';
+              const parts = [];
+              const baseZone = config.zone || utm.zone;
+              if (baseZone) parts.push(baseZone);
+              if (utm.band) parts.push(utm.band);
+              if (utm.hemisphere) parts.push(utm.hemisphere);
+              return parts.length ? parts.join(' ') : 'Auto';
+          })()
+        : 'Geográficas';
+    const instrument = Number.isFinite(config.instrumentHeight)
+        ? `${parseFloat(config.instrumentHeight).toFixed(2)} m`
+        : '—';
+    const verticalRef = config.referenceVertical || 'EGM2008';
+    const autoLock = config.autoLock ? 'Bloqueo automático activo' : 'Bloqueo desactivado';
+
+    card.innerHTML = `
+        <div class="coordinate-card__grid">
+            <dl>
+                <dt>Proyección</dt>
+                <dd>${config.projection} · ${zoneInfo}</dd>
+            </dl>
+            <dl>
+                <dt>Elipsoide</dt>
+                <dd>${ellipsoid.label}</dd>
+            </dl>
+            <dl>
+                <dt>Geoid</dt>
+                <dd>${describeGeoid(config)}</dd>
+            </dl>
+            <dl>
+                <dt>Altura instrumento</dt>
+                <dd>${instrument}</dd>
+            </dl>
+            <dl>
+                <dt>Referencia vertical</dt>
+                <dd>${verticalRef}</dd>
+            </dl>
+        </div>
+        <p class="modal__hint">${autoLock}</p>`;
+}
+
+function populateCoordinateForm() {
+    const form = document.getElementById('coordinateForm');
+    if (!form) return;
+    const config = state.config || DEFAULT_COORDINATE_CONFIG;
+    const ellipsoid = config.ellipsoid || 'WGS84-IGN';
+    const projection = config.projection || 'UTM';
+    const geoidModel = config.geoidModel || 'EGM2008-PERU';
+    const zone = Number.isFinite(config.zone) ? config.zone : '';
+    const undulation = Number.isFinite(config.customUndulation) ? config.customUndulation : '';
+    const region = config.region || 'auto';
+    const instrument = Number.isFinite(config.instrumentHeight) ? config.instrumentHeight : '';
+
+    form.coordinateEllipsoid.value = ellipsoid;
+    form.coordinateProjection.value = projection;
+    form.coordinateGeoid.value = geoidModel;
+    form.coordinateZone.value = zone;
+    form.coordinateUndulation.value = undulation;
+    form.coordinateRegion.value = geoidModel === 'EGM2008-PERU' ? region : 'auto';
+    form.coordinateRegion.disabled = geoidModel !== 'EGM2008-PERU';
+    form.coordinateInstrument.value = instrument !== '' ? parseFloat(instrument).toFixed(2) : '';
+    form.coordinateReference.value = config.referenceVertical || 'EGM2008';
+    form.coordinateAutoLock.checked = !!config.autoLock;
+
+    const customRow = document.getElementById('coordinateCustomRow');
+    if (customRow) {
+        customRow.hidden = geoidModel !== 'CUSTOM';
+    }
+
+    const ellipsoidBadge = document.getElementById('coordinateEllipsoidBadge');
+    if (ellipsoidBadge) {
+        ellipsoidBadge.textContent = getEllipsoidParameters(ellipsoid).label;
+    }
+    const geoidBadge = document.getElementById('coordinateGeoidBadge');
+    if (geoidBadge) {
+        const customValue = geoidModel === 'CUSTOM' ? (undulation === '' ? null : undulation) : config.customUndulation;
+        const regionValue = geoidModel === 'EGM2008-PERU' ? region : 'auto';
+        geoidBadge.textContent = describeGeoid({ ...config, geoidModel, customUndulation: customValue, region: regionValue });
+    }
+}
+
+function populatePointForm() {
+    const form = document.getElementById('pointForm');
+    if (!form) return;
+    refreshGnssDerived();
+    const utm = state.gnss.utm || latLonToUtm(state.gnss.latitude, state.gnss.longitude);
+    const heights = computeHeights(state.gnss.latitude, state.gnss.longitude, state.gnss.altitude);
+    form.pointName.value = getNextPointName();
+    form.pointFeature.value = 'detalle';
+    form.pointDescription.value = '';
+    form.pointAttributes.value = '';
+    form.pointZone.value = utm.zone || '';
+    form.pointHemisphere.value = utm.hemisphere || 'S';
+    form.pointEasting.value = Number.isFinite(utm.easting) ? utm.easting.toFixed(3) : '';
+    form.pointNorthing.value = Number.isFinite(utm.northing) ? utm.northing.toFixed(3) : '';
+    form.pointLat.value = Number.isFinite(state.gnss.latitude) ? state.gnss.latitude.toFixed(6) : '';
+    form.pointLon.value = Number.isFinite(state.gnss.longitude) ? state.gnss.longitude.toFixed(6) : '';
+    form.pointEllipsoidal.value = Number.isFinite(state.gnss.altitude) ? state.gnss.altitude.toFixed(2) : '';
+    form.pointOrthometric.value = Number.isFinite(heights.orthometric) ? heights.orthometric.toFixed(2) : '';
+    form.pointNotes.value = '';
+    form.pointStakeout.checked = false;
+}
+
+function populateStakeoutForm() {
+    const form = document.getElementById('stakeoutForm');
+    if (!form) return;
+    const select = form.stakeoutPoint;
+    select.innerHTML = '';
+
+    state.points.forEach(point => {
+        const option = document.createElement('option');
+        option.value = point.name;
+        if (!point.utm) {
+            point.utm = latLonToUtm(point.lat, point.lon);
+        }
+        option.textContent = `${point.name} · ${point.utm.zone}${point.utm.band}${point.utm.hemisphere} · ${point.utm.easting.toFixed(2)}E / ${point.utm.northing.toFixed(2)}N`;
+        select.appendChild(option);
+    });
+
+    const manualOption = document.createElement('option');
+    manualOption.value = 'manual';
+    manualOption.textContent = 'Usar coordenadas manuales';
+    select.appendChild(manualOption);
+
+    if (state.stakeout.mode === 'manual') {
+        select.value = 'manual';
+    } else if (state.stakeout.targetId && state.points.some(point => point.name === state.stakeout.targetId)) {
+        select.value = state.stakeout.targetId;
+    } else if (state.points.length) {
+        select.value = state.points[0].name;
+    } else {
+        select.value = 'manual';
+    }
+
+    form.stakeoutTolerance.value = state.stakeout.tolerance?.toFixed(2) || '0.05';
+    form.stakeoutPole.value = state.stakeout.poleHeight?.toFixed(2) || '2.00';
+
+    const selectedPoint = state.points.find(point => point.name === select.value);
+    if (state.stakeout.manual) {
+        form.stakeoutLat.value = state.stakeout.manual.lat ?? '';
+        form.stakeoutLon.value = state.stakeout.manual.lon ?? '';
+        form.stakeoutAlt.value = state.stakeout.manual.alt ?? '';
+    } else if (selectedPoint) {
+        form.stakeoutLat.value = selectedPoint.lat.toFixed(6);
+        form.stakeoutLon.value = selectedPoint.lon.toFixed(6);
+        form.stakeoutAlt.value = selectedPoint.alt.toFixed(2);
+    } else {
+        form.stakeoutLat.value = state.gnss.latitude.toFixed(6);
+        form.stakeoutLon.value = state.gnss.longitude.toFixed(6);
+        form.stakeoutAlt.value = state.gnss.altitude.toFixed(2);
+    }
+
+    form.stakeoutManual.checked = state.stakeout.mode === 'manual';
+    form.stakeoutActive.checked = !!state.stakeout.active;
+    form.stakeoutNotes.value = state.stakeout.guidance || '';
+}
+
+function populateLocationForm() {
+    const form = document.getElementById('locationForm');
+    if (!form) return;
+    form.locationLat.value = Number.isFinite(state.gnss.latitude) ? state.gnss.latitude.toFixed(6) : '';
+    form.locationLon.value = Number.isFinite(state.gnss.longitude) ? state.gnss.longitude.toFixed(6) : '';
+    form.locationAlt.value = Number.isFinite(state.gnss.altitude) ? state.gnss.altitude.toFixed(2) : '';
+    const utm = state.gnss.utm || latLonToUtm(state.gnss.latitude, state.gnss.longitude);
+    form.locationZone.value = utm.zone || '';
+    form.locationHemisphere.value = utm.hemisphere || 'N';
+    form.locationEasting.value = Number.isFinite(utm.easting) ? utm.easting.toFixed(3) : '';
+    form.locationNorthing.value = Number.isFinite(utm.northing) ? utm.northing.toFixed(3) : '';
+    form.locationLock.checked = !!state.gnss.locked;
+    form.locationUpdateProject.checked = true;
+}
+
+function updateSatellites() {
+    const panel = document.getElementById('satellitesPanel');
+    panel.innerHTML = '';
+    state.satellites.forEach(sat => {
+        const container = document.createElement('div');
+        container.className = 'satellite';
+        container.innerHTML = `
+            <span class="satellite__id">${sat.id}</span>
+            <div class="satellite__bar"><span style="width: ${Math.min(sat.snr, 60)}%"></span></div>
+            <span>${sat.snr} dBHz</span>`;
+        panel.appendChild(container);
+    });
+
+    document.getElementById('polarChart').textContent = 'Visualización polar disponible en la versión móvil.';
+}
+
+function updateCommands() {
+    const commands = {
+        IMU: [
+            { title: 'TILT ON', cmd: 'TILTCOMPENSATION ENABLE', desc: 'Activa compensación de inclinación' },
+            { title: 'IMU 100Hz', cmd: 'IMURATE 100', desc: 'Frecuencia máxima de fusión' },
+            { title: 'Calibrar IMU', cmd: 'IMUCALIBRATE', desc: 'Mantén quieto el receptor 30s' }
+        ],
+        Posicionamiento: [
+            { title: 'Modo Rover', cmd: 'MODE ROVER', desc: 'Móvil con correcciones RTK' },
+            { title: 'Modo Base', cmd: 'MODE BASE', desc: 'Genera correcciones RTCM' },
+            { title: 'Reset RTK', cmd: 'RTKRESET', desc: 'Limpia solución y reinicia filtros' }
+        ],
+        GNSS: [
+            { title: 'GPS + Galileo', cmd: 'LOG SATVIS', desc: 'Ver constelaciones habilitadas' },
+            { title: 'PPP ON', cmd: 'PPP ENABLE', desc: 'Requiere conexión satelital L-Band' }
+        ]
+    };
+
+    const container = document.getElementById('commandList');
+    container.innerHTML = '';
+
+    Object.entries(commands).forEach(([group, items]) => {
+        const heading = document.createElement('h3');
+        heading.textContent = group;
+        container.appendChild(heading);
+
+        items.forEach(item => {
+            const block = document.createElement('div');
+            block.className = 'command';
+            block.innerHTML = `
+                <div class="command__title">${item.title}</div>
+                <div class="command__desc">${item.desc}</div>
+                <code>${item.cmd}</code>
+                <div class="command__actions">
+                    <button class="ghost-btn" data-command="${item.cmd}">Enviar</button>
+                    <button class="icon-btn" aria-label="Copiar comando" data-copy="${item.cmd}"><i data-lucide="copy"></i></button>
+                </div>`;
+            container.appendChild(block);
+        });
+    });
+}
+
+function updateProfiles() {
+    const profiles = document.getElementById('profiles');
+    profiles.innerHTML = '';
+    const data = [
+        { name: 'Topografía RTK', desc: 'RTK fijo + Tilt', accuracy: '2 cm' },
+        { name: 'PPP L-Band', desc: 'PPP + IMU', accuracy: '5 cm' },
+        { name: 'Base fija', desc: 'RTCM 3.x @ 1Hz', accuracy: 'Controlada' }
+    ];
+
+    data.forEach(profile => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+            <span>
+                <strong>${profile.name}</strong>
+                <small>${profile.desc}</small>
+            </span>
+            <span>${profile.accuracy}</span>`;
+        profiles.appendChild(li);
+    });
+}
+
+function updateFiles() {
+    const list = document.getElementById('fileList');
+    list.innerHTML = '';
+    state.files.forEach(file => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+            <span>
+                <strong>${file.name}</strong>
+                <small>${file.time}</small>
+            </span>
+            <span>${file.size}</span>`;
+        list.appendChild(li);
+    });
+
+    const sync = document.getElementById('syncPanel');
+    sync.innerHTML = `
+        <div><strong>Google Drive</strong><p>${state.sync.drive ? 'Vinculado' : 'Sin conexión'}</p></div>
+        <div><strong>Última sincronización</strong><p>${state.sync.lastSync}</p></div>
+        <div><strong>Pendientes</strong><p>${state.sync.pending}</p></div>
+        <button class="primary-btn" id="syncBtn"><i data-lucide="refresh-cw"></i> Sincronizar ahora</button>`;
+}
+
+function updatePhotoLog() {
+    const container = document.getElementById('photoLog');
+    if (!container) return;
+    container.innerHTML = '';
+    if (!state.photos.length) {
+        container.innerHTML = '<p class="photo-log__empty">Aún no hay capturas. Usa “Tomar foto” para registrar la primera.</p>';
+        return;
+    }
+
+    state.photos.forEach(photo => {
+        const meta = photo.metadata || {};
+        const utm = meta.utm;
+        const location = Number.isFinite(meta.latitude) && Number.isFinite(meta.longitude)
+            ? `${meta.latitude.toFixed(6)}°, ${meta.longitude.toFixed(6)}°`
+            : '—';
+        const utmLabel = utm
+            ? `${utm.zone}${utm.band}${utm.hemisphere} · ${utm.easting.toFixed(2)}E / ${utm.northing.toFixed(2)}N`
+            : '—';
+        const altitude = Number.isFinite(meta.altitude) ? `${meta.altitude.toFixed(2)} m` : '—';
+        const direction = Number.isFinite(meta.direction)
+            ? `${meta.direction.toFixed(1)}°${meta.directionRef ? ` ${meta.directionRef}` : ''}`
+            : '—';
+        const resolution = meta.width && meta.height ? `${meta.width} × ${meta.height}` : '—';
+        const source = meta.source || 'EXIF original';
+        const capturedMs = meta.timestamp ? new Date(meta.timestamp).getTime() : new Date(photo.capturedAt).getTime();
+        const relative = Number.isFinite(capturedMs) ? formatRelativeTime(capturedMs) : '—';
+        const speed = formatSpeed(meta.speed);
+
+        const item = document.createElement('article');
+        item.className = 'photo-log__item';
+        item.innerHTML = `
+            <header>
+                <h3>${photo.name}</h3>
+                <span class="tag">${formatTimestamp(photo.capturedAt)}</span>
+            </header>
+            <dl class="photo-log__meta">
+                <div><dt>Equipo</dt><dd>${[meta.make, meta.model].filter(Boolean).join(' ') || '—'}</dd></div>
+                <div><dt>Óptica</dt><dd>${meta.lens || '—'}</dd></div>
+                <div><dt>ISO</dt><dd>${meta.iso ?? '—'}</dd></div>
+                <div><dt>Exposición</dt><dd>${formatExposure(meta.exposure)}</dd></div>
+                <div><dt>Apertura</dt><dd>${formatFNumber(meta.fnumber)}</dd></div>
+                <div><dt>Focal</dt><dd>${formatFocalLength(meta.focalLength)}</dd></div>
+                <div><dt>Velocidad</dt><dd>${speed}</dd></div>
+                <div><dt>Dirección</dt><dd>${direction}</dd></div>
+                <div><dt>Altitud</dt><dd>${altitude}</dd></div>
+                <div><dt>Resolución</dt><dd>${resolution}</dd></div>
+                <div><dt>Peso</dt><dd>${formatBytes(photo.size)}</dd></div>
+                <div><dt>Lat/Lon</dt><dd>${location}</dd></div>
+                <div><dt>UTM</dt><dd>${utmLabel}</dd></div>
+                <div><dt>Fuente</dt><dd class="is-hint">${source}</dd></div>
+                <div><dt>Referencia</dt><dd class="is-hint">${relative}</dd></div>
+            </dl>`;
+        container.appendChild(item);
+    });
+}
+
+async function extractPhotoMetadata(file) {
+    let data = {};
+    let usedFallback = false;
+    if (typeof exifr !== 'undefined') {
+        try {
+            data = (await exifr.parse(file, {
+                tiff: true,
+                ifd1: true,
+                exif: true,
+                gps: true,
+                xmp: true,
+                translateValues: false
+            })) || {};
+        } catch (error) {
+            console.warn('Lectura EXIF fallida, intentando con buffer', error);
+            try {
+                const buffer = await file.arrayBuffer();
+                data = (await exifr.parse(buffer, {
+                    tiff: true,
+                    ifd1: true,
+                    exif: true,
+                    gps: true,
+                    xmp: true,
+                    translateValues: false
+                })) || {};
+            } catch (fallbackError) {
+                console.warn('No se pudo leer EXIF tras reintento', fallbackError);
+                data = {};
+            }
+        }
+    } else {
+        console.warn('exifr no disponible, usando datos GNSS para la foto');
+        usedFallback = true;
+    }
+
+    const timestamp = normalizeExifDate(data?.DateTimeOriginal || data?.CreateDate || data?.ModifyDate) || new Date().toISOString();
+    let latitude = Number.isFinite(data?.latitude) ? data.latitude : Number.isFinite(data?.GPSLatitude) ? data.GPSLatitude : null;
+    let longitude = Number.isFinite(data?.longitude)
+        ? data.longitude
+        : Number.isFinite(data?.GPSLongitude)
+        ? data.GPSLongitude
+        : null;
+    let altitude = Number.isFinite(data?.GPSAltitude) ? data.GPSAltitude : Number.isFinite(data?.altitude) ? data.altitude : null;
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+        latitude = state.gnss.latitude;
+        longitude = state.gnss.longitude;
+        usedFallback = true;
+    }
+    if (!Number.isFinite(altitude)) {
+        altitude = state.gnss.altitude;
+    }
+    const utm = Number.isFinite(latitude) && Number.isFinite(longitude) ? latLonToUtm(latitude, longitude) : null;
+
+    let exposure = data?.ExposureTime || null;
+    if (!exposure && Number.isFinite(data?.ShutterSpeedValue)) {
+        exposure = 1 / Math.pow(2, data.ShutterSpeedValue);
+    }
+
+    const source = usedFallback ? 'GNSS.AI (sin EXIF completo)' : 'EXIF original';
+
+    return {
+        timestamp,
+        make: data?.Make || data?.make || null,
+        model: data?.Model || data?.model || null,
+        lens: data?.LensModel || data?.lensModel || null,
+        iso: data?.ISO || data?.ISOSpeedRatings || null,
+        exposure,
+        fnumber: data?.FNumber || data?.ApertureValue || null,
+        focalLength: data?.FocalLength || null,
+        width: data?.ExifImageWidth || data?.ImageWidth || null,
+        height: data?.ExifImageHeight || data?.ImageHeight || null,
+        direction: data?.GPSImgDirection || null,
+        directionRef: data?.GPSImgDirectionRef || null,
+        altitude,
+        latitude,
+        longitude,
+        utm,
+        speed: data?.GPSSpeed || null,
+        source
+    };
+}
+
+function setupMap() {
+    map = L.map('map', { zoomControl: false, attributionControl: false }).setView([state.gnss.latitude, state.gnss.longitude], 17);
+
+    hybridLayer = L.tileLayer('https://{s}.tile.jawg.io/jawg-sunny/{z}/{x}/{y}{r}.png?access-token=KPsw7SfjD8VR6pXqJx3NQ0dJrLrE2J28vKb5d9uKZ6SUIZIb2ypz6rZh0GJn4Ojd', {
+        maxZoom: 20
+    });
+
+    topoLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19
+    });
+
+    if (state.mapLayer === 'topo') {
+        topoLayer.addTo(map);
+    } else {
+        hybridLayer.addTo(map);
+    }
+
+    mapMarker = L.circleMarker([state.gnss.latitude, state.gnss.longitude], {
+        radius: 8,
+        color: '#32d4ff',
+        fillColor: '#0ff0b3',
+        fillOpacity: 0.9,
+        weight: 3
+    }).addTo(map);
+
+    pointsLayer = L.layerGroup().addTo(map);
+    renderPointsOnMap();
+}
+
+function updateMap() {
+    if (!map || !mapMarker) return;
+    mapMarker.setLatLng([state.gnss.latitude, state.gnss.longitude]);
+    if (!map.getBounds().contains(mapMarker.getLatLng())) {
+        map.panTo(mapMarker.getLatLng());
+    }
+}
+
+function requestGeolocation() {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+        position => {
+            const { latitude, longitude, altitude } = position.coords;
+            if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+                state.gnss.latitude = latitude;
+                state.gnss.longitude = longitude;
+                if (Number.isFinite(altitude)) {
+                    state.gnss.altitude = altitude;
+                }
+                const utm = latLonToUtm(latitude, longitude);
+                state.gnss.utm = utm;
+                state.gnss.source = 'Geolocalización';
+                state.gnss.updatedAt = Date.now();
+                state.gnss.locked = true;
+                state.project.location = `Zona UTM ${utm.zone}${utm.band}${utm.hemisphere}`;
+                updateSolution();
+                updateStakeoutPanel();
+                updateProject();
+                updateMap();
+                queuePersist();
+            }
+        },
+        error => {
+            console.warn('Geolocalización no disponible', error);
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+    );
+}
+
+function setupSnrChart() {
+    const ctx = document.getElementById('snrChart');
+    snrChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: state.snrHistory.map(item => item.label),
+            datasets: [
+                {
+                    label: 'GPS',
+                    data: state.snrHistory.map(item => item.gps),
+                    borderColor: '#5be7a9',
+                    tension: 0.35,
+                    fill: false
+                },
+                {
+                    label: 'GLONASS',
+                    data: state.snrHistory.map(item => item.glonass),
+                    borderColor: '#ffc75f',
+                    tension: 0.35,
+                    fill: false
+                },
+                {
+                    label: 'Galileo',
+                    data: state.snrHistory.map(item => item.galileo),
+                    borderColor: '#32d4ff',
+                    tension: 0.35,
+                    fill: false
+                }
+            ]
+        },
+        options: {
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { ticks: { color: chartAxisColor() }, grid: { color: chartGridColor() } },
+                y: { ticks: { color: chartAxisColor() }, grid: { color: chartGridColor() }, suggestedMin: 20, suggestedMax: 55 }
+            }
+        }
+    });
+    updateChartTheme();
+}
+
+function updateSnrChart() {
+    state.snrHistory.shift();
+    state.snrHistory.push({
+        label: 'Ahora',
+        gps: 38 + Math.random() * 8,
+        glonass: 34 + Math.random() * 8,
+        galileo: 36 + Math.random() * 8
+    });
+
+    snrChart.data.labels = state.snrHistory.map(item => item.label);
+    snrChart.data.datasets[0].data = state.snrHistory.map(item => item.gps);
+    snrChart.data.datasets[1].data = state.snrHistory.map(item => item.glonass);
+    snrChart.data.datasets[2].data = state.snrHistory.map(item => item.galileo);
+    snrChart.update();
+}
+
+function updateChartTheme() {
+    if (!snrChart) return;
+    const axis = chartAxisColor();
+    const grid = chartGridColor();
+    snrChart.options.scales.x.ticks.color = axis;
+    snrChart.options.scales.y.ticks.color = axis;
+    snrChart.options.scales.x.grid.color = grid;
+    snrChart.options.scales.y.grid.color = grid;
+    snrChart.update('none');
+}
+
+function bindMenu() {
+    document.querySelectorAll('.menu__item').forEach(button => {
+        button.addEventListener('click', () => {
+            document.querySelectorAll('.menu__item').forEach(item => item.classList.remove('is-active'));
+            button.classList.add('is-active');
+
+            Object.values(views).forEach(view => view.classList.remove('is-active'));
+            views[button.dataset.view].classList.add('is-active');
+            Object.entries(views).forEach(([key, view]) => {
+                view.setAttribute('aria-hidden', key === button.dataset.view ? 'false' : 'true');
+            });
+        });
+    });
+}
+
+function bindActions() {
+    const recordBtn = document.getElementById('recordBtn');
+    const mobileRecordBtn = document.getElementById('mobileRecordBtn');
+    const mobileLoggingBtn = document.getElementById('mobileLoggingBtn');
+
+    const toggleRecording = () => {
+        state.recording = !state.recording;
+        updateRecordingButtons();
+        showToast(state.recording ? 'Grabando puntos GNSS' : 'Registro detenido');
+        updateLoggingCard();
+        updateLoggingSummary();
+        if (!state.recording) {
+            state.logging.startedAutomatically = false;
+        }
+        queuePersist();
+    };
+
+    document.getElementById('themeToggle').addEventListener('click', () => {
+        body.classList.toggle('light');
+        showToast(body.classList.contains('light') ? 'Modo claro activado' : 'Modo nocturno activado');
+        updateChartTheme();
+    });
+
+    document.getElementById('modeToggle').addEventListener('click', () => {
+        state.mode = state.mode === 'Rover' ? 'Base' : 'Rover';
+        document.querySelector('.mode-toggle__value').textContent = state.mode;
+        showToast(`Modo ${state.mode}`);
+        queuePersist();
+    });
+
+    if (recordBtn) {
+        recordBtn.addEventListener('click', toggleRecording);
+    }
+    if (mobileRecordBtn) {
+        mobileRecordBtn.addEventListener('click', toggleRecording);
+    }
+
+    document.getElementById('copyCoords').addEventListener('click', () => {
+        navigator.clipboard.writeText(`${state.gnss.latitude.toFixed(7)}, ${state.gnss.longitude.toFixed(7)}, ${state.gnss.altitude.toFixed(2)}`);
+        showToast('Coordenadas copiadas');
+    });
+
+    document.getElementById('refreshBtn').addEventListener('click', () => {
+        simulateUpdate();
+        showToast('Datos actualizados');
+    });
+
+    document.getElementById('mapReset').addEventListener('click', () => {
+        map.flyTo([state.gnss.latitude, state.gnss.longitude], 17, { duration: 0.6 });
+    });
+
+    document.getElementById('mapLayer').addEventListener('click', () => {
+        if (state.mapLayer === 'hybrid') {
+            map.removeLayer(hybridLayer);
+            topoLayer.addTo(map);
+            state.mapLayer = 'topo';
+            showToast('Capa Topográfica activada');
+        } else {
+            map.removeLayer(topoLayer);
+            hybridLayer.addTo(map);
+            state.mapLayer = 'hybrid';
+            showToast('Capa Satelital activada');
+        }
+        queuePersist();
+    });
+
+    const mapManualBtn = document.getElementById('mapManual');
+    if (mapManualBtn) {
+        mapManualBtn.addEventListener('click', () => {
+            populateLocationForm();
+            openModal('locationModal');
+        });
+    }
+
+    document.getElementById('newPointBtn').addEventListener('click', () => {
+        populatePointForm();
+        openModal('pointModal');
+    });
+
+    document.getElementById('filesView').addEventListener('click', event => {
+        if (event.target.closest('#syncBtn')) {
+            state.sync.lastSync = 'Hace instantes';
+            state.sync.pending = 0;
+            updateFiles();
+            lucide.createIcons();
+            showToast('Sincronización completada');
+            queuePersist();
+        }
+    });
+
+    const captureBtn = document.getElementById('capturePhotoBtn');
+    const photoInput = document.getElementById('photoInput');
+    if (captureBtn && photoInput) {
+        captureBtn.addEventListener('click', () => {
+            photoInput.click();
+        });
+        photoInput.addEventListener('change', async event => {
+            const [file] = event.target.files || [];
+            if (!file) return;
+            try {
+                showToast('Procesando metadatos EXIF…');
+                const metadata = await extractPhotoMetadata(file);
+                const entry = {
+                    id: `${Date.now()}`,
+                    name: file.name || `Captura ${state.photos.length + 1}`,
+                    size: file.size,
+                    capturedAt: metadata.timestamp,
+                    metadata
+                };
+                state.photos.unshift(entry);
+                state.events.unshift({ title: 'Foto fotogramétrica registrada', time: 'Ahora mismo' });
+                state.events = state.events.slice(0, 6);
+                updatePhotoLog();
+                updateTimeline();
+                queuePersist();
+                const toastMessage = metadata.source && metadata.source.includes('GNSS')
+                    ? 'Foto registrada con datos GNSS'
+                    : 'Foto registrada con metadatos EXIF';
+                showToast(toastMessage);
+            } catch (error) {
+                console.error('Error leyendo metadatos', error);
+                showToast('No se pudieron leer los metadatos EXIF');
+            } finally {
+                event.target.value = '';
+            }
+        });
+    }
+
+    document.getElementById('controlView').addEventListener('click', event => {
+        const copy = event.target.closest('[data-copy]');
+        if (copy) {
+            navigator.clipboard.writeText(copy.dataset.copy);
+            showToast('Comando copiado');
+        }
+        const send = event.target.closest('[data-command]');
+        if (send) {
+            showToast(`Enviado: ${send.dataset.command}`);
+        }
+    });
+
+    const coordinateBtn = document.getElementById('coordinateConfigBtn');
+    if (coordinateBtn) {
+        coordinateBtn.addEventListener('click', () => {
+            populateCoordinateForm();
+            openModal('coordinateModal');
+        });
+    }
+
+    document.getElementById('projectConfigBtn').addEventListener('click', () => {
+        populateProjectForm();
+        openModal('projectModal');
+    });
+
+    document.getElementById('ntripConfigBtn').addEventListener('click', () => {
+        populateNtripForm();
+        openModal('ntripModal');
+    });
+
+    document.getElementById('ntripCardBtn').addEventListener('click', () => {
+        populateNtripForm();
+        openModal('ntripModal');
+    });
+
+    const shareLinkBtn = document.getElementById('ntripShareLink');
+    if (shareLinkBtn) {
+        shareLinkBtn.addEventListener('click', async () => {
+            try {
+                const { url } = buildNtripSharePackage();
+                if (navigator.share) {
+                    await navigator.share({ title: 'Perfil NTRIP GNSS.AI', text: 'Perfil de correcciones K922', url });
+                    showToast('Enlace NTRIP enviado');
+                } else {
+                    copyToClipboard(url, 'Enlace NTRIP copiado');
+                }
+            } catch (error) {
+                console.error('No se pudo compartir enlace NTRIP', error);
+                showToast('No se pudo generar el enlace NTRIP');
+            }
+        });
+    }
+
+    const shareTokenBtn = document.getElementById('ntripShareToken');
+    if (shareTokenBtn) {
+        shareTokenBtn.addEventListener('click', () => {
+            try {
+                const { token } = buildNtripSharePackage();
+                copyToClipboard(token, 'Token NTRIP copiado');
+            } catch (error) {
+                console.error('No se pudo generar token NTRIP', error);
+                showToast('No se pudo generar el token NTRIP');
+            }
+        });
+    }
+
+    document.getElementById('loggingConfigBtn').addEventListener('click', () => {
+        populateLoggingForm();
+        openModal('loggingModal');
+    });
+
+    document.getElementById('loggingCardBtn').addEventListener('click', () => {
+        populateLoggingForm();
+        openModal('loggingModal');
+    });
+
+    if (mobileLoggingBtn) {
+        mobileLoggingBtn.addEventListener('click', () => {
+            populateLoggingForm();
+            openModal('loggingModal');
+        });
+    }
+
+    document.getElementById('stakeoutBtn').addEventListener('click', () => {
+        populateStakeoutForm();
+        openModal('stakeoutModal');
+    });
+
+    updateRecordingButtons();
+}
+
+function bindForms() {
+    const pointForm = document.getElementById('pointForm');
+    pointForm.addEventListener('submit', event => {
+        event.preventDefault();
+        const data = new FormData(pointForm);
+        let name = (data.get('pointName') || getNextPointName()).trim();
+        if (!name) {
+            name = getNextPointName();
+        }
+        const feature = data.get('pointFeature') || 'detalle';
+        const description = data.get('pointDescription') || '';
+        const attributes = data.get('pointAttributes') || '';
+        const zone = parseInt(data.get('pointZone'), 10);
+        const hemisphere = (data.get('pointHemisphere') || 'S').toUpperCase();
+        const easting = parseFloat(data.get('pointEasting'));
+        const northing = parseFloat(data.get('pointNorthing'));
+        let latitude = parseFloat(data.get('pointLat'));
+        let longitude = parseFloat(data.get('pointLon'));
+        let utm = null;
+        if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+            utm = latLonToUtm(latitude, longitude);
+        } else if (Number.isFinite(zone) && Number.isFinite(easting) && Number.isFinite(northing)) {
+            const converted = utmToLatLon({ zone, hemisphere, easting, northing });
+            if (converted) {
+                latitude = converted.latitude;
+                longitude = converted.longitude;
+                utm = converted.utm;
+            }
+        }
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+            showToast('Coordenadas inválidas para el punto. Revisa lat/long o UTM.');
+            return;
+        }
+        if (!utm) {
+            utm = latLonToUtm(latitude, longitude);
+        }
+        let altEllipsoidal = parseFloat(data.get('pointEllipsoidal'));
+        if (!Number.isFinite(altEllipsoidal)) {
+            altEllipsoidal = state.gnss.altitude;
+        }
+        let ortho = parseFloat(data.get('pointOrthometric'));
+        const heights = computeHeights(latitude, longitude, altEllipsoidal);
+        if (!Number.isFinite(ortho)) {
+            ortho = heights.orthometric;
+        }
+        const accuracy = Math.max(0.005, state.gnss.horizontalAccuracy || 0.01);
+        const now = new Date();
+        const timestamp = now.toLocaleString('es-PE', {
+            hour12: false,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        const entry = {
+            name,
+            feature,
+            description,
+            attributes,
+            lat: latitude,
+            lon: longitude,
+            alt: altEllipsoidal,
+            orthometric: Number.isFinite(ortho) ? ortho : null,
+            geoid: heights.geoid,
+            accuracy,
+            notes: data.get('pointNotes') || '',
+            date: timestamp,
+            utm: utm ? { ...utm } : null
+        };
+        state.points.unshift(entry);
+        state.events.unshift({ title: `Punto ${entry.name} guardado`, time: 'Ahora mismo' });
+        state.events = state.events.slice(0, 6);
+
+        if (data.get('pointStakeout') === 'on') {
+            state.stakeout.active = true;
+            state.stakeout.mode = 'point';
+            state.stakeout.targetId = entry.name;
+            state.stakeout.manual = null;
+        }
+
+        updateTimeline();
+        updatePoints();
+        updateStakeoutPanel();
+        queuePersist();
+        closeModal('pointModal');
+        showToast(`Punto ${entry.name} almacenado`);
+    });
+
+    const coordinateForm = document.getElementById('coordinateForm');
+    if (coordinateForm) {
+        const customRow = document.getElementById('coordinateCustomRow');
+        const geoidSelect = coordinateForm.coordinateGeoid;
+        const regionSelect = coordinateForm.coordinateRegion;
+
+        const syncCoordinateControls = () => {
+            if (customRow) {
+                customRow.hidden = geoidSelect.value !== 'CUSTOM';
+            }
+            if (regionSelect) {
+                regionSelect.disabled = geoidSelect.value !== 'EGM2008-PERU';
+            }
+        };
+
+        const refreshCoordinateBadges = () => {
+            const ellipsoidBadge = document.getElementById('coordinateEllipsoidBadge');
+            if (ellipsoidBadge) {
+                ellipsoidBadge.textContent = getEllipsoidParameters(coordinateForm.coordinateEllipsoid.value).label;
+            }
+            const geoidBadge = document.getElementById('coordinateGeoidBadge');
+            if (geoidBadge) {
+                const undulationValue = parseFloat(coordinateForm.coordinateUndulation.value);
+                const customValue = geoidSelect.value === 'CUSTOM' && Number.isFinite(undulationValue)
+                    ? undulationValue
+                    : geoidSelect.value === 'CUSTOM'
+                    ? null
+                    : state.config.customUndulation;
+                const regionValue = geoidSelect.value === 'EGM2008-PERU'
+                    ? coordinateForm.coordinateRegion.value || 'auto'
+                    : 'auto';
+                geoidBadge.textContent = describeGeoid({
+                    ...state.config,
+                    geoidModel: geoidSelect.value,
+                    customUndulation: customValue,
+                    region: regionValue
+                });
+            }
+        };
+
+        syncCoordinateControls();
+        refreshCoordinateBadges();
+
+        coordinateForm.addEventListener('change', event => {
+            if (event.target.closest('#coordinateGeoid, #coordinateUndulation, #coordinateRegion, #coordinateEllipsoid')) {
+                syncCoordinateControls();
+                refreshCoordinateBadges();
+            }
+        });
+
+        coordinateForm.addEventListener('submit', event => {
+            event.preventDefault();
+            const data = new FormData(coordinateForm);
+            const updated = { ...state.config };
+            updated.ellipsoid = data.get('coordinateEllipsoid') || updated.ellipsoid;
+            updated.projection = data.get('coordinateProjection') || updated.projection;
+            const zoneValue = parseInt(data.get('coordinateZone'), 10);
+            updated.zone = Number.isFinite(zoneValue) ? zoneValue : null;
+            updated.geoidModel = data.get('coordinateGeoid') || updated.geoidModel;
+            const undulationValue = parseFloat(data.get('coordinateUndulation'));
+            updated.customUndulation = updated.geoidModel === 'CUSTOM' && Number.isFinite(undulationValue)
+                ? undulationValue
+                : updated.geoidModel === 'CUSTOM'
+                ? null
+                : state.config.customUndulation;
+            updated.region = updated.geoidModel === 'EGM2008-PERU' ? data.get('coordinateRegion') || 'auto' : 'auto';
+            const instrumentValue = parseFloat(data.get('coordinateInstrument'));
+            if (Number.isFinite(instrumentValue)) {
+                updated.instrumentHeight = instrumentValue;
+            }
+            updated.referenceVertical = data.get('coordinateReference') || updated.referenceVertical;
+            updated.autoLock = data.get('coordinateAutoLock') === 'on';
+
+            state.config = updated;
+            if (state.config.autoLock) {
+                state.gnss.locked = true;
+            }
+
+            refreshGnssDerived();
+            state.points.forEach(point => {
+                if (!Number.isFinite(point.lat) || !Number.isFinite(point.lon)) return;
+                point.utm = latLonToUtm(point.lat, point.lon);
+                const heights = computeHeights(point.lat, point.lon, point.alt);
+                point.geoid = heights.geoid;
+                point.orthometric = heights.orthometric;
+            });
+            state.photos.forEach(photo => {
+                if (!photo?.metadata) return;
+                const { latitude, longitude } = photo.metadata;
+                if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+                    photo.metadata.utm = latLonToUtm(latitude, longitude);
+                }
+            });
+
+            updateSolution();
+            updateProject();
+            updatePoints();
+            updateStakeoutPanel();
+            updateCoordinateCard();
+            queuePersist();
+            closeModal('coordinateModal');
+            showToast('Parámetros geodésicos actualizados');
+        });
+    }
+
+    const projectForm = document.getElementById('projectForm');
+    projectForm.addEventListener('submit', event => {
+        event.preventDefault();
+        const data = new FormData(projectForm);
+        state.project.name = data.get('projectName') || state.project.name;
+        state.project.location = data.get('projectLocation') || state.project.location;
+        state.project.owner = data.get('projectOwner') || state.project.owner;
+        state.project.accuracy = data.get('projectAccuracy') || state.project.accuracy;
+        state.project.code = data.get('projectCode') || state.project.code;
+        state.project.notes = data.get('projectNotes') || '';
+        state.project.stakeout.target = data.get('stakeoutTarget') || state.project.stakeout.target;
+        const distance = parseFloat(data.get('stakeoutDistance'));
+        const bearing = parseFloat(data.get('stakeoutBearing'));
+        if (!Number.isNaN(distance)) state.project.stakeout.distance = distance;
+        if (!Number.isNaN(bearing)) state.project.stakeout.bearing = bearing;
+
+        if (data.get('projectReset') === 'on') {
+            state.points = [];
+            updatePoints();
+        }
+
+        state.events.unshift({ title: 'Proyecto actualizado', time: 'Ahora mismo' });
+        state.events = state.events.slice(0, 6);
+        updateTimeline();
+        updateStakeoutPanel();
+        queuePersist();
+        closeModal('projectModal');
+        showToast('Proyecto actualizado');
+    });
+
+    const ntripForm = document.getElementById('ntripForm');
+    ntripForm.addEventListener('submit', event => {
+        event.preventDefault();
+        const data = new FormData(ntripForm);
+        state.ntrip.enabled = data.get('ntripEnabled') === 'on';
+        state.ntrip.caster = data.get('ntripCaster') || state.ntrip.caster;
+        state.ntrip.port = parseInt(data.get('ntripPort'), 10) || state.ntrip.port;
+        state.ntrip.mountpoint = data.get('ntripMountpoint') || state.ntrip.mountpoint;
+        state.ntrip.format = data.get('ntripFormat') || state.ntrip.format;
+        state.ntrip.username = data.get('ntripUser') || '';
+        state.ntrip.password = data.get('ntripPass') || '';
+        state.ntrip.bitrate = data.get('ntripBitrate') || state.ntrip.bitrate;
+        const latency = parseFloat(data.get('ntripLatency'));
+        if (!Number.isNaN(latency)) state.ntrip.latency = latency;
+        state.ntrip.ssl = data.get('ntripSsl') === 'on';
+        state.ntrip.notes = data.get('ntripNotes') || '';
+        state.ntrip.lastConnect = state.ntrip.enabled ? 'Hace instantes' : 'Detenido';
+
+        state.events.unshift({ title: state.ntrip.enabled ? 'NTRIP conectado' : 'NTRIP detenido', time: 'Ahora mismo' });
+        state.events = state.events.slice(0, 6);
+
+        updateTimeline();
+        updateNtripCard();
+        updateServices();
+        updateStatusCards();
+        queuePersist();
+        closeModal('ntripModal');
+        showToast(state.ntrip.enabled ? 'NTRIP listo para transmitir' : 'Sesión NTRIP desactivada');
+    });
+
+    const ntripTransfer = document.getElementById('ntripTransfer');
+    const ntripTransferStatus = document.getElementById('ntripTransferStatus');
+    const updateTransferStatus = (message, tone) => {
+        if (!ntripTransferStatus) return;
+        ntripTransferStatus.textContent = message;
+        ntripTransferStatus.classList.remove('is-success', 'is-error');
+        if (tone === 'success') {
+            ntripTransferStatus.classList.add('is-success');
+        } else if (tone === 'error') {
+            ntripTransferStatus.classList.add('is-error');
+        }
+    };
+    const importBtn = document.getElementById('ntripImportApply');
+    if (importBtn && ntripTransfer) {
+        importBtn.addEventListener('click', () => {
+            const raw = ntripTransfer.value.trim();
+            if (!raw) {
+                updateTransferStatus('Ingresa un token o enlace NTRIP para importarlo', 'error');
+                return;
+            }
+            const profile = decodeNtripPayload(raw);
+            if (applyNtripProfile(profile)) {
+                updateTransferStatus('Perfil NTRIP importado', 'success');
+                queuePersist();
+            } else {
+                updateTransferStatus('No se pudo interpretar el token NTRIP', 'error');
+            }
+        });
+    }
+    const clearBtn = document.getElementById('ntripTransferClear');
+    if (clearBtn && ntripTransfer) {
+        clearBtn.addEventListener('click', () => {
+            ntripTransfer.value = '';
+            updateTransferStatus('Campo limpio y listo para pegar un token');
+        });
+    }
+
+    const loggingForm = document.getElementById('loggingForm');
+    loggingForm.addEventListener('submit', event => {
+        event.preventDefault();
+        const data = new FormData(loggingForm);
+        state.logging.nmea = data.get('loggingNmea') === 'on';
+        state.logging.rinex = data.get('loggingRinex') === 'on';
+        state.logging.rtcm = data.get('loggingRtcm') === 'on';
+        state.logging.autoUpload = data.get('loggingAuto') === 'on';
+        state.logging.autoStart = data.get('loggingAutoStart') === 'on';
+        state.logging.interval = Math.max(1, parseInt(data.get('loggingInterval'), 10) || state.logging.interval);
+        state.logging.path = data.get('loggingPath') || state.logging.path;
+        state.logging.destination = data.get('loggingDestination') || state.logging.destination;
+        state.logging.notes = data.get('loggingNotes') || '';
+        if (!state.logging.autoStart) {
+            state.logging.startedAutomatically = false;
+        }
+
+        updateLoggingCard();
+        updateLoggingSummary();
+        populateLoggingForm();
+        queuePersist();
+        closeModal('loggingModal');
+        showToast('Perfil de logging actualizado');
+    });
+
+    const stakeoutForm = document.getElementById('stakeoutForm');
+    stakeoutForm.addEventListener('submit', event => {
+        event.preventDefault();
+        const data = new FormData(stakeoutForm);
+        state.stakeout.tolerance = parseFloat(data.get('stakeoutTolerance')) || state.stakeout.tolerance;
+        state.stakeout.poleHeight = parseFloat(data.get('stakeoutPole')) || state.stakeout.poleHeight;
+        state.stakeout.guidance = data.get('stakeoutNotes') || '';
+        state.stakeout.active = data.get('stakeoutActive') === 'on';
+
+        const manual = data.get('stakeoutManual') === 'on' || data.get('stakeoutPoint') === 'manual';
+        if (manual) {
+            state.stakeout.mode = 'manual';
+            state.stakeout.targetId = 'Manual';
+            let lat = parseFloat(data.get('stakeoutLat'));
+            let lon = parseFloat(data.get('stakeoutLon'));
+            let alt = parseFloat(data.get('stakeoutAlt'));
+            if (!Number.isFinite(lat)) lat = state.gnss.latitude;
+            if (!Number.isFinite(lon)) lon = state.gnss.longitude;
+            if (!Number.isFinite(alt)) alt = state.gnss.altitude;
+            const utm = latLonToUtm(lat, lon);
+            state.stakeout.manual = {
+                lat,
+                lon,
+                alt,
+                utm
+            };
+        } else {
+            const targetId = data.get('stakeoutPoint');
+            if (targetId) {
+                state.stakeout.targetId = targetId;
+            }
+            state.stakeout.mode = 'point';
+            state.stakeout.manual = null;
+        }
+
+        if (!state.stakeout.active) {
+            state.project.stakeout = { target: '—', distance: 0, bearing: 0 };
+            state.stakeout.offsets = { north: 0, east: 0, up: 0 };
+        }
+
+        updateStakeoutPanel();
+        queuePersist();
+        closeModal('stakeoutModal');
+        showToast('Replanteo actualizado');
+    });
+
+    const locationForm = document.getElementById('locationForm');
+    if (locationForm) {
+        locationForm.addEventListener('submit', event => {
+            event.preventDefault();
+            const data = new FormData(locationForm);
+            const lat = parseFloat(data.get('locationLat'));
+            const lon = parseFloat(data.get('locationLon'));
+            const alt = parseFloat(data.get('locationAlt'));
+            let coords = null;
+            if (Number.isFinite(lat) && Number.isFinite(lon)) {
+                coords = { latitude: lat, longitude: lon };
+            } else {
+                const zone = parseInt(data.get('locationZone'), 10);
+                const easting = parseFloat(data.get('locationEasting'));
+                const northing = parseFloat(data.get('locationNorthing'));
+                const hemisphere = data.get('locationHemisphere') || 'N';
+                if (Number.isFinite(zone) && Number.isFinite(easting) && Number.isFinite(northing)) {
+                    coords = utmToLatLon({ zone, hemisphere, easting, northing });
+                }
+            }
+            if (!coords || !Number.isFinite(coords.latitude) || !Number.isFinite(coords.longitude)) {
+                showToast('Coordenadas inválidas. Revisa lat/lon o valores UTM.');
+                return;
+            }
+            if (Number.isFinite(alt)) {
+                state.gnss.altitude = alt;
+            }
+            state.gnss.latitude = coords.latitude;
+            state.gnss.longitude = coords.longitude;
+            state.gnss.utm = coords.utm || latLonToUtm(coords.latitude, coords.longitude);
+            state.gnss.source = Number.isFinite(lat) && Number.isFinite(lon) ? 'Manual lat/lon' : 'Manual UTM';
+            state.gnss.updatedAt = Date.now();
+            state.gnss.locked = data.get('locationLock') === 'on';
+            if (data.get('locationUpdateProject') === 'on') {
+                state.project.location = `Zona UTM ${state.gnss.utm.zone}${state.gnss.utm.band}${state.gnss.utm.hemisphere}`;
+                updateProject();
+            }
+            updateSolution();
+            updateStakeoutPanel();
+            updateMap();
+            queuePersist();
+            closeModal('locationModal');
+            showToast('Ubicación GNSS actualizada');
+        });
+    }
+}
+
+function simulateUpdate() {
+    const jitter = () => (Math.random() - 0.5) * 0.00005;
+    if (!state.gnss.locked) {
+        state.gnss.latitude += jitter();
+        state.gnss.longitude += jitter();
+        state.gnss.altitude += (Math.random() - 0.5) * 0.05;
+        state.gnss.horizontalAccuracy = Math.max(0.009, state.gnss.horizontalAccuracy + (Math.random() - 0.5) * 0.002);
+        state.gnss.hdop = Math.max(0.6, state.gnss.hdop + (Math.random() - 0.5) * 0.1);
+        state.gnss.satellites = Math.max(16, Math.min(32, state.gnss.satellites + Math.round((Math.random() - 0.5) * 2)));
+        state.gnss.age = Math.max(0.6, state.gnss.age + (Math.random() - 0.5) * 0.4);
+        state.gnss.updatedAt = Date.now();
+        state.gnss.source = state.gnss.source || 'Simulado';
+    } else {
+        state.gnss.age = Math.max(0.6, state.gnss.age + (Math.random() - 0.5) * 0.1);
+    }
+
+    if (state.gnss.horizontalAccuracy < 0.012) {
+        state.gnss.fix = 'RTK Fixed';
+    } else if (state.gnss.horizontalAccuracy < 0.02) {
+        state.gnss.fix = 'RTK Float';
+    } else {
+        state.gnss.fix = 'Float';
+    }
+
+    state.imu.heading = (state.imu.heading + (Math.random() - 0.5) * 1.5 + 360) % 360;
+    state.imu.pitch += (Math.random() - 0.5) * 0.3;
+    state.imu.roll += (Math.random() - 0.5) * 0.3;
+
+    if (state.ntrip.enabled) {
+        state.ntrip.latency = Math.max(0.6, state.ntrip.latency + (Math.random() - 0.5) * 0.2);
+        state.ntrip.lastConnect = 'Hace instantes';
+    }
+
+    if (state.logging.autoStart && state.gnss.fix === 'RTK Fixed' && !state.recording && !state.logging.startedAutomatically) {
+        state.recording = true;
+        state.logging.startedAutomatically = true;
+        updateRecordingButtons();
+        updateLoggingCard();
+        updateLoggingSummary();
+        showToast('Grabación automática iniciada');
+    }
+
+    state.satellites.forEach(sat => {
+        sat.snr = Math.max(20, Math.min(55, sat.snr + (Math.random() - 0.5) * 2));
+    });
+
+    state.events.unshift({ title: 'Estado actualizado', time: 'Ahora mismo' });
+    state.events = state.events.slice(0, 6);
+
+    updateStatusCards();
+    updateSolution();
+    updateConstellations();
+    updateServices();
+    updateImu();
+    updateTimeline();
+    updateProject();
+    updateStakeoutPanel();
+    updateNtripCard();
+    updateSatellites();
+    updateSnrChart();
+    updateLoggingCard();
+    updateLoggingSummary();
+    updateMap();
+    queuePersist();
+    lucide.createIcons();
+}
+
+function init() {
+    hydrateFromStorage();
+    applyNtripFromUrl();
+    lucide.createIcons();
+    bindMenu();
+    bindActions();
+    bindForms();
+    setupModals();
+    setupMap();
+    setupSnrChart();
+    requestGeolocation();
+    updateStatusCards();
+    updateSolution();
+    updateConstellations();
+    updateServices();
+    updateImu();
+    updateTimeline();
+    updateStakeoutPanel();
+    updatePoints();
+    updateSatellites();
+    updateCommands();
+    updateProfiles();
+    updateFiles();
+    updateNtripCard();
+    updateLoggingCard();
+    updateLoggingSummary();
+    updateCoordinateCard();
+    updatePhotoLog();
+    updateSessionTimer();
+
+    if (canPersist && typeof window !== 'undefined') {
+        window.addEventListener('storage', event => {
+            if (event.key === STORAGE_KEY) {
+                hydrateFromStorage();
+                updateStatusCards();
+                updateSolution();
+                updateConstellations();
+                updateServices();
+                updateImu();
+                updateTimeline();
+                updateStakeoutPanel();
+                updatePoints();
+                updateSatellites();
+                updateCommands();
+                updateProfiles();
+                updateFiles();
+                updateNtripCard();
+                updateLoggingCard();
+                updateLoggingSummary();
+                updateRecordingButtons();
+                updateCoordinateCard();
+                updatePhotoLog();
+                updateMap();
+            }
+        });
+    }
+
+    setInterval(updateSessionTimer, 1000);
+    setInterval(simulateUpdate, 5000);
+
+    if (pendingNtripNotice) {
+        showToast(pendingNtripNotice);
+        pendingNtripNotice = null;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
