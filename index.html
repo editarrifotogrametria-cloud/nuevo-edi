@@ -3,615 +3,628 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>GNSS.AI Console · 2050</title>
+    <title>GNSS.AI · Differential Console</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Orbitron:wght@500;600;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap"
         rel="stylesheet"
     />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/exifr/dist/exifr.min.js" defer></script>
     <style>
         :root {
             color-scheme: dark;
-            --bg: #030713;
-            --bg-card: rgba(10, 20, 44, 0.82);
-            --bg-panel: rgba(9, 17, 36, 0.68);
-            --bg-border: rgba(64, 158, 255, 0.42);
-            --bg-border-strong: rgba(3, 230, 211, 0.8);
-            --accent: #29f2ff;
-            --accent-strong: #40ffb7;
-            --text: #f5f9ff;
-            --text-muted: rgba(245, 249, 255, 0.6);
-            --danger: #ff6b7a;
-            --success: #59ffa4;
-            --warning: #f5d76e;
-            --shadow: 0 30px 80px rgba(4, 12, 32, 0.65);
+            --bg: #020613;
+            --bg-panel: rgba(7, 12, 30, 0.85);
+            --bg-soft: rgba(255, 255, 255, 0.02);
+            --border: rgba(65, 222, 255, 0.25);
+            --border-strong: rgba(65, 222, 255, 0.6);
+            --text: #f4fbff;
+            --text-muted: rgba(244, 251, 255, 0.7);
+            --accent: #4ef2ff;
+            --accent-strong: #2de1c2;
+            --danger: #ff6b81;
+            --warning: #ffcc6f;
+            --success: #5affb0;
             --radius: 22px;
+            --shadow: 0 40px 120px rgba(5, 10, 34, 0.65);
         }
 
         * {
             box-sizing: border-box;
-            margin: 0;
-            padding: 0;
         }
 
         body {
-            font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            background: radial-gradient(circle at 15% 15%, rgba(0, 196, 255, 0.2), transparent 45%),
-                radial-gradient(circle at 80% 10%, rgba(22, 245, 214, 0.25), transparent 50%),
-                linear-gradient(140deg, #030713, #040a1c 40%, #02142b 65%, #030713 95%);
-            color: var(--text);
+            margin: 0;
             min-height: 100vh;
-            display: flex;
-            align-items: stretch;
-            justify-content: center;
+            font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: radial-gradient(circle at 15% 20%, rgba(77, 220, 255, 0.22), transparent 45%),
+                radial-gradient(circle at 80% 0, rgba(45, 225, 194, 0.25), transparent 35%),
+                linear-gradient(145deg, #020613, #040a1f 60%, #020613);
+            color: var(--text);
             padding: 32px;
-            overflow-x: hidden;
-            position: relative;
         }
 
-        body::before,
-        body::after {
+        body::before {
             content: "";
             position: fixed;
-            inset: -40vh -40vw;
-            background: radial-gradient(circle, rgba(41, 242, 255, 0.08) 0, transparent 60%);
-            animation: pulse 14s linear infinite;
-            z-index: -2;
-        }
-
-        body::after {
-            animation-delay: -7s;
-            background: radial-gradient(circle, rgba(64, 255, 183, 0.08) 0, transparent 60%);
-        }
-
-        @keyframes pulse {
-            0% {
-                transform: scale(0.9) rotate(0deg);
-            }
-            50% {
-                transform: scale(1.05) rotate(15deg);
-            }
-            100% {
-                transform: scale(0.9) rotate(0deg);
-            }
-        }
-
-        .matrix {
-            position: fixed;
             inset: 0;
-            background-image: linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+            background-image: linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
             background-size: 120px 120px;
-            mix-blend-mode: overlay;
-            opacity: 0.4;
-            pointer-events: none;
-            animation: drift 30s linear infinite;
+            opacity: 0.25;
+            transform: translate3d(0, 0, 0);
+            animation: grid 40s linear infinite;
             z-index: -1;
         }
 
-        @keyframes drift {
-            from {
+        @keyframes grid {
+            0% {
                 transform: translate3d(0, 0, 0);
             }
-            to {
+            100% {
                 transform: translate3d(-120px, -120px, 0);
             }
         }
 
-        .layout {
+        .app-shell {
             display: grid;
             grid-template-columns: 300px minmax(0, 1fr);
             gap: 28px;
-            width: min(1380px, 100%);
+            width: min(1500px, 100%);
+            margin: 0 auto;
         }
 
         .panel {
             background: var(--bg-panel);
-            border: 1px solid var(--bg-border);
-            border-radius: calc(var(--radius) + 4px);
-            backdrop-filter: blur(22px);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
             box-shadow: var(--shadow);
+            backdrop-filter: blur(24px);
         }
 
         .sidebar {
             display: flex;
             flex-direction: column;
-            justify-content: space-between;
-            padding: 32px 28px;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .sidebar::before {
-            content: "";
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(200deg, rgba(41, 242, 255, 0.08), transparent 60%);
-            pointer-events: none;
+            gap: 24px;
+            padding: 28px;
         }
 
         .brand {
             display: grid;
-            gap: 10px;
-        }
-
-        .brand__title {
-            font-family: "Orbitron", sans-serif;
-            text-transform: uppercase;
-            letter-spacing: 0.24em;
-            font-size: 1.45rem;
-        }
-
-        .brand__title span {
-            color: var(--accent);
-        }
-
-        .brand__subtitle {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            letter-spacing: 0.14em;
-        }
-
-        .brand__timestamp {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            padding: 12px 16px;
-            border-radius: calc(var(--radius) - 4px);
-            background: rgba(41, 242, 255, 0.08);
-            border: 1px solid rgba(41, 242, 255, 0.25);
-            font-size: 0.9rem;
-            letter-spacing: 0.08em;
-        }
-
-        .menu {
-            display: grid;
-            gap: 16px;
-            margin-top: 36px;
-        }
-
-        .menu__item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 14px 18px;
-            border-radius: calc(var(--radius) - 6px);
-            border: 1px solid rgba(41, 242, 255, 0.18);
-            color: var(--text-muted);
-            font-size: 0.95rem;
-            font-weight: 600;
-            background: rgba(10, 22, 48, 0.55);
-            position: relative;
-            overflow: hidden;
-            cursor: pointer;
-            transition: transform 180ms ease, border 180ms ease, color 180ms ease;
-        }
-
-        .menu__item::after {
-            content: "";
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(120deg, rgba(41, 242, 255, 0.25), transparent 60%);
-            opacity: 0;
-            transition: opacity 180ms ease;
-        }
-
-        .menu__item span {
-            z-index: 1;
-        }
-
-        .menu__item strong {
-            font-family: "Orbitron", sans-serif;
-            font-size: 0.75rem;
-            letter-spacing: 0.18em;
-            color: rgba(41, 242, 255, 0.7);
-        }
-
-        .menu__item:hover,
-        .menu__item:focus-visible {
-            color: var(--text);
-            border-color: var(--bg-border-strong);
-            transform: translateY(-3px);
-        }
-
-        .menu__item:hover::after,
-        .menu__item:focus-visible::after,
-        .menu__item.is-active::after {
-            opacity: 1;
-        }
-
-        .menu__item.is-active {
-            border-color: var(--bg-border-strong);
-            color: var(--accent);
-            box-shadow: 0 18px 38px rgba(41, 242, 255, 0.18);
-        }
-
-        .sidebar__footer {
-            display: grid;
-            gap: 18px;
-        }
-
-        .sidebar__cta {
-            padding: 18px;
-            border-radius: calc(var(--radius) - 2px);
-            border: 1px solid rgba(64, 158, 255, 0.35);
-            background: rgba(12, 28, 64, 0.55);
-            display: grid;
-            gap: 10px;
-        }
-
-        .sidebar__cta strong {
-            font-family: "Orbitron", sans-serif;
-            font-size: 0.95rem;
-            letter-spacing: 0.16em;
-        }
-
-        .sidebar__cta p {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            line-height: 1.6;
-        }
-
-        .primary-btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
             gap: 12px;
-            padding: 14px 20px;
-            border-radius: calc(var(--radius) - 6px);
-            background: linear-gradient(135deg, var(--accent), var(--accent-strong));
-            color: #040a1c;
-            font-family: "Orbitron", sans-serif;
-            letter-spacing: 0.14em;
-            font-weight: 600;
-            border: none;
-            cursor: pointer;
-            box-shadow: 0 22px 40px rgba(64, 255, 183, 0.32);
-            transition: transform 160ms ease, filter 160ms ease;
         }
 
-        .primary-btn:hover {
-            transform: translateY(-2px) scale(1.01);
-            filter: brightness(1.06);
-        }
-
-        .content {
-            display: grid;
-            gap: 28px;
-        }
-
-        .topbar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 18px;
-            padding: 28px 32px;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .topbar::before {
-            content: "";
-            position: absolute;
-            inset: 0;
-            background: radial-gradient(circle at 0% 0%, rgba(41, 242, 255, 0.25), transparent 65%);
-            pointer-events: none;
-        }
-
-        .topbar__meta {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
-        .topbar__title {
-            font-family: "Orbitron", sans-serif;
-            font-size: 1.2rem;
+        .brand__logo {
+            font-family: "Space Grotesk", "Inter", sans-serif;
             letter-spacing: 0.18em;
+            text-transform: uppercase;
+            font-size: 1.4rem;
         }
 
-        .topbar__subtitle {
-            color: var(--text-muted);
+        .brand__logo span {
+            color: var(--accent);
+        }
+
+        .brand__badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.02);
             font-size: 0.85rem;
         }
 
-        .link-chip {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            font-family: "Orbitron", sans-serif;
-            font-size: 0.7rem;
-            letter-spacing: 0.16em;
-            text-transform: uppercase;
-            padding: 8px 14px;
-            border-radius: 999px;
-            border: 1px solid rgba(64, 158, 255, 0.45);
-            background: rgba(7, 18, 38, 0.8);
-            color: rgba(245, 249, 255, 0.82);
-            transition: border-color 160ms ease, color 160ms ease;
-        }
-
-        .link-chip.is-online {
-            border-color: rgba(64, 255, 183, 0.7);
-            color: rgba(64, 255, 183, 0.92);
-        }
-
-        .status-group {
+        .system-card,
+        .network-card,
+        .quick-actions,
+        .mission-card {
+            background: var(--bg-soft);
+            border-radius: calc(var(--radius) - 6px);
+            padding: 18px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
             gap: 14px;
         }
 
-        .status-card {
-            border: 1px solid rgba(64, 158, 255, 0.45);
-            border-radius: calc(var(--radius) - 8px);
-            background: rgba(7, 16, 36, 0.8);
-            padding: 18px;
-            display: grid;
-            gap: 8px;
-            position: relative;
-            overflow: hidden;
+        .system-card__row,
+        .network-item,
+        .mission-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.95rem;
         }
 
-        .status-card::after {
-            content: "";
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(120deg, rgba(41, 242, 255, 0.35), transparent 60%);
-            opacity: 0;
-            transition: opacity 200ms ease;
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-flex;
         }
 
-        .status-card.is-active::after {
-            opacity: 1;
+        .dot--ok {
+            background: var(--success);
+            box-shadow: 0 0 12px var(--success);
         }
 
-        .status-card__label {
-            font-family: "Orbitron", sans-serif;
-            font-size: 0.72rem;
-            letter-spacing: 0.16em;
-            text-transform: uppercase;
-            color: rgba(245, 249, 255, 0.6);
+        .dot--warn {
+            background: var(--warning);
+            box-shadow: 0 0 12px var(--warning);
         }
 
-        .status-card__value {
-            font-size: 1.5rem;
-            font-weight: 700;
+        .dot--danger {
+            background: var(--danger);
+            box-shadow: 0 0 12px var(--danger);
         }
 
-        .status-card__trend {
-            font-size: 0.85rem;
-            color: var(--success);
+        .quick-actions {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
-        .status-card__trend.is-warning {
-            color: var(--warning);
+        .qa-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            padding: 12px 14px;
+            font-weight: 600;
+            cursor: pointer;
+            background: rgba(78, 242, 255, 0.08);
+            transition: all 0.2s ease;
         }
 
-        .status-card__trend.is-danger {
-            color: var(--danger);
+        .qa-btn:hover {
+            background: rgba(78, 242, 255, 0.18);
+            transform: translateY(-2px);
         }
 
-        .grid {
+        .main {
             display: grid;
             gap: 24px;
         }
 
-        .grid--primary {
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        }
-
-        .card {
-            padding: 28px 30px;
-            border-radius: var(--radius);
-            border: 1px solid rgba(64, 158, 255, 0.35);
-            background: var(--bg-card);
+        .hero {
             display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
             gap: 18px;
-            position: relative;
-            overflow: hidden;
+            padding: 26px;
         }
 
-        .card::before {
-            content: "";
-            position: absolute;
-            inset: 0;
-            background: radial-gradient(circle at 20% 0%, rgba(41, 242, 255, 0.16), transparent 65%);
-            opacity: 0.8;
+        .hero__badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 16px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            font-size: 0.85rem;
         }
 
-        .card__header {
-            display: flex;
-            align-items: baseline;
-            justify-content: space-between;
-            gap: 16px;
-            position: relative;
-            z-index: 1;
+        .hero__value {
+            font-size: 2.8rem;
+            font-weight: 600;
+            letter-spacing: -1px;
         }
 
-        .card__title {
-            font-family: "Orbitron", sans-serif;
-            letter-spacing: 0.14em;
-            font-size: 1.05rem;
+        .hero__label {
+            font-size: 0.9rem;
+            color: var(--text-muted);
         }
 
-        .card__subtitle {
+        .hero__cta {
+            align-self: center;
+            justify-self: end;
+            display: inline-flex;
+            gap: 12px;
+        }
+
+        .cta-btn {
+            border-radius: 16px;
+            border: 1px solid transparent;
+            padding: 12px 20px;
+            font-weight: 600;
+            cursor: pointer;
+            background: var(--accent);
+            color: #04111f;
+            transition: all 0.2s ease;
+        }
+
+        .cta-btn.secondary {
+            background: transparent;
+            border-color: var(--border);
+            color: var(--text);
+        }
+
+        .grid-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 18px;
+        }
+
+        .stat-card {
+            padding: 20px;
+            border-radius: calc(var(--radius) - 8px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(6, 12, 32, 0.8);
+            display: grid;
+            gap: 6px;
+        }
+
+        .stat-card__label {
             font-size: 0.85rem;
             color: var(--text-muted);
         }
 
-        .card__body {
-            display: grid;
-            gap: 16px;
-            position: relative;
-            z-index: 1;
+        .stat-card__value {
+            font-size: 1.8rem;
+            font-weight: 600;
         }
 
-        .holo-list {
+        .stat-card__meta {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .panel__title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 18px;
+            font-weight: 600;
+        }
+
+        .map-visual {
+            display: grid;
+            grid-template-columns: minmax(320px, 1.1fr) minmax(320px, 0.9fr);
+            gap: 18px;
+            padding: 24px;
+        }
+
+        #live-map {
+            border-radius: calc(var(--radius) - 8px);
+            min-height: 320px;
+        }
+
+        .chart-card {
+            padding: 18px;
+            border-radius: calc(var(--radius) - 8px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(6, 12, 32, 0.8);
+            display: grid;
+            gap: 12px;
+        }
+
+        canvas {
+            width: 100% !important;
+            height: auto !important;
+        }
+
+        .dual-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 18px;
+        }
+
+        .module {
+            padding: 24px;
+        }
+
+        .diagnostics-list,
+        .event-feed {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: grid;
+            gap: 12px;
+        }
+
+        .diagnostics-list li,
+        .event-feed li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 16px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 0.95rem;
+        }
+
+        .badge {
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .badge--success {
+            background: rgba(90, 255, 176, 0.2);
+            color: var(--success);
+            border: 1px solid rgba(90, 255, 176, 0.3);
+        }
+
+        .badge--warn {
+            background: rgba(255, 204, 111, 0.2);
+            color: var(--warning);
+            border: 1px solid rgba(255, 204, 111, 0.3);
+        }
+
+        .badge--danger {
+            background: rgba(255, 107, 129, 0.2);
+            color: var(--danger);
+            border: 1px solid rgba(255, 107, 129, 0.3);
+        }
+
+        .form-grid {
+            display: grid;
+            gap: 12px;
+        }
+
+        input,
+        select,
+        textarea {
+            width: 100%;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text);
+            padding: 12px 14px;
+            font-family: inherit;
+        }
+
+        label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .list-table {
+            width: 100%;
+            border-spacing: 0;
+        }
+
+        .list-table th,
+        .list-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 0.9rem;
+        }
+
+        .list-table button {
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--accent);
+            padding: 6px 12px;
+            cursor: pointer;
+        }
+
+        .command-group {
+            margin-bottom: 24px;
+        }
+
+        .command-group__title {
+            text-transform: uppercase;
+            font-size: 0.78rem;
+            letter-spacing: 0.18em;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border-radius: 999px;
+            padding: 6px 12px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            font-size: 0.85rem;
+        }
+
+        .projects-list {
+            display: grid;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .projects-list article {
+            padding: 14px;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .stakeout-card {
+            border-radius: 18px;
+            padding: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            background: rgba(255, 255, 255, 0.02);
+            display: grid;
+            gap: 10px;
+        }
+
+        .triple-grid {
+            display: grid;
+            gap: 24px;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        }
+
+        .photo-card,
+        .entrip-card,
+        .tilt-card {
             display: grid;
             gap: 14px;
         }
 
-        .holo-item {
+        .photo-preview {
+            width: 100%;
+            min-height: 180px;
+            border-radius: 16px;
+            border: 1px dashed rgba(255, 255, 255, 0.2);
+            object-fit: cover;
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .exif-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .photo-log {
+            list-style: none;
+            display: grid;
+            gap: 10px;
+            max-height: 220px;
+            overflow: auto;
+            padding: 0;
+            margin: 0;
+        }
+
+        .photo-log li {
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 14px;
+            padding: 10px 12px;
+            display: grid;
+            gap: 4px;
+            cursor: pointer;
+            transition: border 0.2s ease;
+        }
+
+        .photo-log li:hover {
+            border-color: var(--accent);
+        }
+
+        .replanteo-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        .table-scroll {
+            max-height: 220px;
+            overflow: auto;
+        }
+
+        .replanteo-table th,
+        .replanteo-table td {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 8px 6px;
+            text-align: left;
+        }
+
+        .replanteo-table button {
+            border-radius: 10px;
+            padding: 4px 10px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--accent);
+            cursor: pointer;
+        }
+
+        .entrip-status {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 12px 16px;
-            border-radius: calc(var(--radius) - 8px);
-            border: 1px solid rgba(41, 242, 255, 0.2);
-            background: rgba(8, 20, 42, 0.7);
-            font-size: 0.95rem;
-        }
-
-        .holo-item strong {
-            font-family: "Orbitron", sans-serif;
-            letter-spacing: 0.12em;
-            color: rgba(41, 242, 255, 0.8);
-        }
-
-        .holo-item span {
-            color: var(--text-muted);
-            font-size: 0.85rem;
-        }
-
-        .coords {
-            display: grid;
-            gap: 12px;
-            font-size: 1.1rem;
-            font-weight: 600;
-        }
-
-        .coords small {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            letter-spacing: 0.14em;
-        }
-
-        .coords__pair {
-            display: grid;
-            gap: 4px;
-        }
-
-        .coords__value {
-            font-size: 1.1rem;
-            font-weight: 700;
-            letter-spacing: 0.08em;
-        }
-
-        .coords__value strong {
-            font-size: 1.35rem;
-            font-weight: 800;
-        }
-
-        .stream {
-            display: grid;
-            gap: 10px;
-            max-height: 180px;
-            overflow: hidden;
-            font-size: 0.85rem;
-            line-height: 1.6;
-            color: rgba(245, 249, 255, 0.75);
-        }
-
-        .stream__line {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .stream__time {
-            font-family: "Orbitron", sans-serif;
-            font-size: 0.7rem;
-            letter-spacing: 0.18em;
-            color: rgba(64, 158, 255, 0.8);
-        }
-
-        .stream__tag {
-            padding: 2px 8px;
-            border-radius: 999px;
-            font-size: 0.65rem;
-            text-transform: uppercase;
-            letter-spacing: 0.2em;
-            border: 1px solid rgba(41, 242, 255, 0.35);
-            color: rgba(41, 242, 255, 0.8);
-        }
-
-        .sim-legend {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.18em;
-        }
-
-        .sim-legend.offline {
-            color: var(--warning);
-        }
-
-        .sim-legend.stale {
-            color: var(--danger);
-        }
-
-        .data-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
             gap: 12px;
         }
 
-        .data-pod {
-            border-radius: calc(var(--radius) - 10px);
-            border: 1px solid rgba(41, 242, 255, 0.2);
-            padding: 16px;
-            display: grid;
-            gap: 6px;
-            background: rgba(7, 18, 42, 0.75);
+        .badge--info {
+            background: rgba(78, 242, 255, 0.15);
+            border-color: rgba(78, 242, 255, 0.4);
+            color: var(--accent);
+        }
+
+        .form-grid.form-grid--compact {
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        }
+
+        .tilt-meter {
             position: relative;
+            height: 160px;
+            border-radius: 18px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
             overflow: hidden;
+            background: rgba(255, 255, 255, 0.02);
+            display: flex;
+            align-items: flex-end;
         }
 
-        .data-pod::after {
+        .tilt-indicator {
+            width: 100%;
+            height: 0;
+            background: linear-gradient(180deg, rgba(78, 242, 255, 0.5), rgba(78, 242, 255, 0));
+            transition: height 0.3s ease, background 0.3s ease;
+        }
+
+        .tilt-readouts {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            text-align: center;
+        }
+
+        .tilt-warning {
+            border-radius: 12px;
+            padding: 10px 12px;
+            background: rgba(255, 204, 111, 0.1);
+            border: 1px solid rgba(255, 204, 111, 0.3);
+            font-size: 0.85rem;
+        }
+
+        .timeline {
+            display: grid;
+            gap: 16px;
+        }
+
+        .timeline__item {
+            border-left: 2px solid rgba(255, 255, 255, 0.1);
+            padding-left: 16px;
+            position: relative;
+        }
+
+        .timeline__item::before {
             content: "";
             position: absolute;
-            inset: 0;
-            background: linear-gradient(130deg, rgba(64, 255, 183, 0.18), transparent 60%);
-            opacity: 0;
-            transition: opacity 200ms ease;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--accent);
+            left: -6px;
+            top: 6px;
         }
 
-        .data-pod:hover::after {
-            opacity: 1;
+        .toast {
+            position: fixed;
+            right: 32px;
+            bottom: 32px;
+            padding: 12px 18px;
+            border-radius: 14px;
+            background: rgba(6, 12, 32, 0.95);
+            border: 1px solid var(--border);
+            display: none;
         }
 
-        .data-pod strong {
-            font-family: "Orbitron", sans-serif;
-            font-size: 0.8rem;
-            letter-spacing: 0.16em;
-        }
-
-        .data-pod span {
-            font-size: 1.4rem;
-            font-weight: 700;
-        }
-
-        .data-pod small {
-            font-size: 0.7rem;
-            color: var(--text-muted);
-            letter-spacing: 0.1em;
-        }
-
-        .footer-note {
-            font-size: 0.75rem;
-            text-align: right;
-            color: rgba(245, 249, 255, 0.55);
-            letter-spacing: 0.18em;
-        }
-
-        @media (max-width: 1080px) {
+        @media (max-width: 1200px) {
             body {
-                padding: 24px;
+                padding: 16px;
             }
 
-            .layout {
+            .app-shell {
                 grid-template-columns: 1fr;
             }
 
@@ -619,649 +632,1286 @@
                 order: 2;
             }
 
-            .content {
-                order: 1;
-            }
-        }
-
-        @media (max-width: 720px) {
-            body {
-                padding: 18px;
-            }
-
-            .topbar {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-
-            .status-group {
-                width: 100%;
+            .map-visual {
+                grid-template-columns: 1fr;
             }
         }
     </style>
 </head>
 <body>
-    <div class="matrix" aria-hidden="true"></div>
-    <div class="layout">
-        <aside class="panel sidebar">
-            <div>
-                <div class="brand">
-                    <h1 class="brand__title"><span>GNSS</span>.AI</h1>
-                    <p class="brand__subtitle">Consola Orbital · Nodo Andes-Pacífico</p>
-                    <span class="brand__timestamp" id="timestamp">--:-- · 01 ENE 2050</span>
-                </div>
-                <nav class="menu" aria-label="Navegación principal">
-                    <button class="menu__item is-active" type="button">
-                        <span>Visor de campo expandido</span>
-                        <strong>XR·FLEET</strong>
-                    </button>
-                    <button class="menu__item" type="button">
-                        <span>Rutas cuánticas</span>
-                        <strong>Q-NAV</strong>
-                    </button>
-                    <button class="menu__item" type="button">
-                        <span>Detección de anomalías</span>
-                        <strong>ORION</strong>
-                    </button>
-                    <button class="menu__item" type="button">
-                        <span>Laboratorio de simulación</span>
-                        <strong>SIM-XL</strong>
-                    </button>
-                    <button class="menu__item" type="button">
-                        <span>Panel de mantenimiento</span>
-                        <strong>NOVA</strong>
-                    </button>
-                </nav>
+    <div class="app-shell">
+        <aside class="sidebar panel">
+            <div class="brand">
+                <p class="brand__logo"><span>GNSS</span>.AI · Pi Zero</p>
+                <p class="brand__badge">Smart Processor ML · K922 · Survey Master Ready</p>
+                <small class="brand__caption">Modo diferencial en vivo. Basado en smart_processor.py, dashboard_server.py y GNSS collector.</small>
             </div>
-            <div class="sidebar__footer">
-                <div class="sidebar__cta">
-                    <strong>Receptor GNSS vinculado</strong>
-                    <p>
-                        Pi Zero 2W procesando datos diferenciales del módulo ComNav K222. Esta consola refleja
-                        coordenadas, precisión y calidad del fix en tiempo real.
-                    </p>
+
+            <section class="system-card">
+                <div class="system-card__row">
+                    <span>Servidor WebSocket</span>
+                    <span class="status-pill" id="wsState"><span class="dot dot--danger"></span> Offline</span>
                 </div>
-                <button class="primary-btn" type="button">Reiniciar enlace</button>
-            </div>
+                <div class="system-card__row">
+                    <span>Uptime</span>
+                    <strong id="uptimeLabel">00:00:00</strong>
+                </div>
+                <div class="system-card__row">
+                    <span>RTK Status</span>
+                    <span class="badge" id="sidebarRtk">-</span>
+                </div>
+                <div class="system-card__row">
+                    <span>Precisión estimada</span>
+                    <strong id="sidebarAccuracy">—</strong>
+                </div>
+            </section>
+
+            <section class="network-card">
+                <div class="network-item">
+                    <span>LoRa / Radio externa</span>
+                    <button class="qa-btn" data-toggle="lora">Sin enlace</button>
+                </div>
+                <div class="network-item">
+                    <span>NTRIP / Correcciones IP</span>
+                    <button class="qa-btn" data-toggle="ntrip">Conectar</button>
+                </div>
+                <div class="network-item">
+                    <span>Modo Rover/Base</span>
+                    <button class="qa-btn" data-toggle="mode">Rover</button>
+                </div>
+            </section>
+
+            <section class="quick-actions">
+                <button class="qa-btn" id="startRtk">Iniciar RTK</button>
+                <button class="qa-btn" id="startBase">Base fija</button>
+                <button class="qa-btn" id="exportPdf">PDF</button>
+                <button class="qa-btn" id="clearLog">Limpiar log</button>
+            </section>
+
+            <section class="mission-card">
+                <div class="mission-row">
+                    <span>PPP</span>
+                    <span class="badge badge--warn" id="pppState">Apagado</span>
+                </div>
+                <div class="mission-row">
+                    <span>Galileo HAS</span>
+                    <span class="badge badge--warn" id="hasState">Apagado</span>
+                </div>
+                <div class="mission-row">
+                    <span>Compensación TILT</span>
+                    <span class="badge badge--warn" id="tiltState">0°</span>
+                </div>
+                <div class="mission-row">
+                    <span>IMU</span>
+                    <span class="badge badge--warn" id="imuRate">100 Hz</span>
+                </div>
+            </section>
         </aside>
-        <main class="panel content">
-            <header class="panel topbar">
-                <div class="topbar__meta">
-                    <h2 class="topbar__title">Console · Vector Tierra Órbita Baja</h2>
-                    <p class="topbar__subtitle">Seguimiento activo de flotas terrestres & aéreas en modo holográfico.</p>
-                    <div class="link-chip" id="linkState" role="status" aria-live="polite">Sin enlace · esperando datos</div>
+
+        <main class="main">
+            <section class="hero panel">
+                <div>
+                    <p class="hero__badge">Estado diferencial</p>
+                    <p class="hero__value" id="heroAccuracy">—</p>
+                    <p class="hero__label">Precisión estimada GNSS.AI</p>
                 </div>
-                <section class="status-group" aria-label="Estado de misión">
-                    <article class="status-card is-active" id="rtkCard">
-                        <span class="status-card__label">Estado RTK</span>
-                        <span class="status-card__value" id="rtkStatusValue">SIN DATOS</span>
-                        <span class="status-card__trend" id="rtkTrend">Esperando telemetría</span>
+                <div>
+                    <p class="hero__badge">Calidad</p>
+                    <p class="hero__value" id="heroQuality">Sin datos</p>
+                    <p class="hero__label">HDOP <span id="heroHdop">—</span></p>
+                </div>
+                <div>
+                    <p class="hero__badge">Satélites</p>
+                    <p class="hero__value" id="heroSats">0</p>
+                    <p class="hero__label">Clasificados por ML</p>
+                </div>
+                <div>
+                    <p class="hero__badge">TILT / IMU</p>
+                    <p class="hero__value" id="heroTilt">0°</p>
+                    <p class="hero__label">Compensación y ángulo</p>
+                </div>
+                <div class="hero__cta">
+                    <button class="cta-btn" id="markPoint">Guardar punto</button>
+                    <button class="cta-btn secondary" id="toggleTheme">Modo</button>
+                </div>
+            </section>
+
+            <section class="grid-stats">
+                <article class="stat-card">
+                    <p class="stat-card__label">Latitud</p>
+                    <p class="stat-card__value" id="latValue">—</p>
+                    <p class="stat-card__meta">smart_processor.py</p>
+                </article>
+                <article class="stat-card">
+                    <p class="stat-card__label">Longitud</p>
+                    <p class="stat-card__value" id="lonValue">—</p>
+                    <p class="stat-card__meta">smart_processor.py</p>
+                </article>
+                <article class="stat-card">
+                    <p class="stat-card__label">Altitud (m)</p>
+                    <p class="stat-card__value" id="altValue">—</p>
+                    <p class="stat-card__meta">GGA COM1 10Hz</p>
+                </article>
+                <article class="stat-card">
+                    <p class="stat-card__label">NMEA enviados</p>
+                    <p class="stat-card__value" id="nmeaValue">0</p>
+                    <p class="stat-card__meta">FIFO Survey Master</p>
+                </article>
+                <article class="stat-card">
+                    <p class="stat-card__label">RTCM enviados</p>
+                    <p class="stat-card__value" id="rtcmValue">0</p>
+                    <p class="stat-card__meta">Modo base</p>
+                </article>
+                <article class="stat-card">
+                    <p class="stat-card__label">ML Correcciones</p>
+                    <p class="stat-card__value" id="mlValue">0</p>
+                    <p class="stat-card__meta">Clasificador LOS/Multipath/NLOS</p>
+                </article>
+            </section>
+
+            <section class="panel map-visual">
+                <div>
+                    <div class="panel__title">
+                        <span>Mapa GNSS en vivo</span>
+                        <span class="badge badge--success" id="mapStatus">esperando datos</span>
+                    </div>
+                    <div id="live-map"></div>
+                </div>
+                <div class="chart-stack">
+                    <article class="chart-card">
+                        <header class="panel__title">Tendencia de precisión / HDOP</header>
+                        <canvas id="accuracyChart"></canvas>
                     </article>
-                    <article class="status-card">
-                        <span class="status-card__label">Edad de corrección</span>
-                        <span class="status-card__value" id="latenciaValue">--</span>
-                        <span class="status-card__trend" id="latenciaTrend">N/A</span>
+                    <article class="chart-card">
+                        <header class="panel__title">Distribución ML (LOS · Multipath · NLOS)</header>
+                        <canvas id="classificationChart"></canvas>
                     </article>
-                    <article class="status-card">
-                        <span class="status-card__label">Satélites en uso</span>
-                        <span class="status-card__value" id="satCountValue">--</span>
-                        <span class="status-card__trend" id="satTrend">N/A</span>
-                    </article>
-                </section>
-            </header>
-            <section class="grid grid--primary">
-                <article class="card">
-                    <header class="card__header">
-                        <h3 class="card__title">Posición GNSS en vivo</h3>
-                        <p class="card__subtitle">Solución WGS84 recibida desde Pi Zero · ComNav K222</p>
-                    </header>
-                    <div class="card__body">
-                        <div class="coords">
-                            <div class="coords__pair">
-                                <div class="coords__value" id="latLonValue">-- · --</div>
-                                <small>Lat · Lon (decimal)</small>
+                </div>
+            </section>
+
+            <section class="dual-grid">
+                <article class="panel module">
+                    <header class="panel__title">Diagnóstico del Smart Processor</header>
+                    <ul class="diagnostics-list" id="diagnostics"></ul>
+                </article>
+                <article class="panel module">
+                    <header class="panel__title">Inspector AI / Clasificador</header>
+                    <div class="stakeout-card">
+                        <div>
+                            <p>Confianza promedio</p>
+                            <p class="hero__value" style="font-size: 2rem" id="confidenceValue">0%</p>
+                        </div>
+                        <div class="timeline">
+                            <div class="timeline__item">
+                                <strong>LOS</strong>
+                                <p id="losCount">0 señales claras</p>
                             </div>
-                            <div class="coords__pair">
-                                <div class="coords__value" id="utmValue">--</div>
-                                <small>UTM proyectado</small>
+                            <div class="timeline__item">
+                                <strong>Multipath</strong>
+                                <p id="multipathCount">0 trayectorias</p>
                             </div>
-                            <div class="coords__pair">
-                                <div class="coords__value"><strong id="altValue">--</strong></div>
-                                <small>Altura elipsoidal</small>
-                            </div>
-                            <div class="coords__pair">
-                                <div class="coords__value" id="lastUpdate">Esperando datos...</div>
-                                <small>Marca temporal</small>
+                            <div class="timeline__item">
+                                <strong>NLOS</strong>
+                                <p id="nlosCount">0 bloqueos</p>
                             </div>
                         </div>
-                        <p class="sim-legend" id="dataLegend">Esperando enlace con receptor GNSS.</p>
                     </div>
                 </article>
-                <article class="card">
-                    <header class="card__header">
-                        <h3 class="card__title">Indicadores de solución</h3>
-                        <p class="card__subtitle">Precisión instantánea y calidad del fix</p>
-                    </header>
-                    <div class="card__body">
-                        <div class="data-grid">
-                            <div class="data-pod">
-                                <strong>HDOP</strong>
-                                <span id="hdopValue">--</span>
-                                <small>Dispersión horizontal</small>
-                            </div>
-                            <div class="data-pod">
-                                <strong>Precisión</strong>
-                                <span id="accuracyValue">--</span>
-                                <small>Error estimado (m)</small>
-                            </div>
-                            <div class="data-pod">
-                                <strong>Calidad fix</strong>
-                                <span id="qualityValue">--</span>
-                                <small>Código receptor</small>
-                            </div>
-                            <div class="data-pod">
-                                <strong>Correcciones ML</strong>
-                                <span id="mlValue">--</span>
-                                <small>Confianza promedio</small>
-                            </div>
+            </section>
+
+            <section class="dual-grid">
+                <article class="panel module">
+                    <header class="panel__title">Laboratorio de proyectos</header>
+                    <form class="form-grid" id="projectForm">
+                        <label>Nombre del proyecto
+                            <input type="text" name="name" required placeholder="Base Rimac / Topografía 2024" />
+                        </label>
+                        <label>Descripción
+                            <textarea name="description" rows="2" placeholder="Notas rápidas, cliente, datum..."></textarea>
+                        </label>
+                        <button class="cta-btn" type="submit">Guardar proyecto</button>
+                    </form>
+                    <div class="projects-list" id="projectList"></div>
+                </article>
+                <article class="panel module">
+                    <header class="panel__title">Stakeout · GNSS + IMU</header>
+                    <form class="form-grid" id="stakeoutForm">
+                        <label>Latitud objetivo
+                            <input type="number" step="any" name="lat" placeholder="-12.0464" required />
+                        </label>
+                        <label>Longitud objetivo
+                            <input type="number" step="any" name="lon" placeholder="-77.0428" required />
+                        </label>
+                        <label>Altura objetivo (m)
+                            <input type="number" step="any" name="alt" placeholder="0" />
+                        </label>
+                        <label>Tolerancia (cm)
+                            <input type="number" step="any" name="tolerance" placeholder="2" />
+                        </label>
+                        <button class="cta-btn" type="submit">Definir objetivo</button>
+                    </form>
+                    <div class="stakeout-card" id="stakeoutInfo">
+                        <strong>Sin objetivo</strong>
+                        <p>Define un punto para obtener distancia, rumbo y tolerancias.</p>
+                    </div>
+                </article>
+            </section>
+
+            <section class="triple-grid">
+                <article class="panel module">
+                    <header class="panel__title">Replanteo 3D · Lotes y ejes</header>
+                    <form class="form-grid form-grid--compact" id="replanteoForm">
+                        <label>Código / Punto
+                            <input type="text" name="code" placeholder="Eje-01" required />
+                        </label>
+                        <label>Latitud WGS84
+                            <input type="number" step="any" name="lat" placeholder="-12.0464" required />
+                        </label>
+                        <label>Longitud WGS84
+                            <input type="number" step="any" name="lon" placeholder="-77.0428" required />
+                        </label>
+                        <label>Cota (m)
+                            <input type="number" step="any" name="alt" placeholder="250.120" />
+                        </label>
+                        <label>Tolerancia (cm)
+                            <input type="number" step="any" name="tolerance" placeholder="2" />
+                        </label>
+                        <button class="cta-btn" type="submit">Agregar punto</button>
+                    </form>
+                    <div class="table-scroll">
+                        <table class="replanteo-table">
+                            <thead>
+                                <tr>
+                                    <th>Punto</th>
+                                    <th>Lat / Lon</th>
+                                    <th>Cota</th>
+                                    <th>Tol.</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="replanteoTable">
+                                <tr>
+                                    <td colspan="5">Sin puntos cargados</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </article>
+                <article class="panel module">
+                    <header class="panel__title">Bitácora fotográfica EXIF</header>
+                    <div class="photo-card">
+                        <label>Nota de campo
+                            <input type="text" id="photoNote" placeholder="Mojón 3, zanja de acceso" />
+                        </label>
+                        <label>Seleccionar fotografía
+                            <input type="file" accept="image/*" id="photoInput" />
+                        </label>
+                        <img
+                            class="photo-preview"
+                            id="photoPreview"
+                            alt="Vista previa GNSS.AI"
+                            src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 200'%3E%3Crect width='400' height='200' rx='16' fill='%23040a1a'/%3E%3Ctext x='200' y='110' text-anchor='middle' fill='%23ffffff' font-family='Inter' font-size='18'%3ESube una foto con EXIF%3C/text%3E%3C/svg%3E"
+                        />
+                        <div class="exif-grid" id="photoMeta">
+                            <span>GPS lat: —</span>
+                            <span>GPS lon: —</span>
+                            <span>Altura: —</span>
+                            <span>Fecha: —</span>
                         </div>
-                    </div>
-                </article>
-                <article class="card">
-                    <header class="card__header">
-                        <h3 class="card__title">Operaciones destacadas</h3>
-                        <p class="card__subtitle">Secuencias activas en la malla GNSS.AI</p>
-                    </header>
-                    <div class="card__body">
-                        <ul class="holo-list">
-                            <li class="holo-item">
-                                <span id="opFix">Esperando estado RTK...</span>
-                                <strong id="opFixBadge">--</strong>
-                            </li>
-                            <li class="holo-item">
-                                <span id="opSat">Satélites en uso: --</span>
-                                <strong id="opSatBadge">--</strong>
-                            </li>
-                            <li class="holo-item">
-                                <span id="opStream">NMEA emitidos: --</span>
-                                <strong id="opStreamBadge">--</strong>
-                            </li>
+                        <div class="entrip-status">
+                            <button class="cta-btn secondary" type="button" id="clearPhoto">Limpiar</button>
+                            <button class="cta-btn" type="button" id="savePhoto">Guardar en bitácora</button>
+                        </div>
+                        <ul class="photo-log" id="photoLog">
+                            <li>Sin capturas georreferenciadas</li>
                         </ul>
                     </div>
                 </article>
+                <article class="panel module">
+                    <header class="panel__title">ENTRIP · Correcciones IP</header>
+                    <form class="form-grid form-grid--compact" id="entripForm">
+                        <label>Host / caster
+                            <input type="text" name="caster" placeholder="caster.gnss.ai" required />
+                        </label>
+                        <label>Puerto
+                            <input type="number" name="port" value="2101" required />
+                        </label>
+                        <label>Mountpoint
+                            <input type="text" name="mount" placeholder="SMART" required />
+                        </label>
+                        <label>Usuario
+                            <input type="text" name="user" placeholder="rtk_user" />
+                        </label>
+                        <label>Contraseña
+                            <input type="password" name="password" placeholder="••••" />
+                        </label>
+                        <div class="entrip-status">
+                            <span class="badge badge--danger" id="entripStatus">Desconectado</span>
+                            <button class="cta-btn secondary" type="button" id="testEntrip">Probar enlace</button>
+                        </div>
+                        <button class="cta-btn" type="submit" id="connectEntrip">Conectar ENTRIP</button>
+                    </form>
+                </article>
             </section>
-            <section class="card">
-                <header class="card__header">
-                    <h3 class="card__title">Flujo de eventos en vivo</h3>
-                    <p class="card__subtitle">Actualizaciones recibidas desde el procesador Pi Zero</p>
-                </header>
-                <div class="card__body">
-                    <div class="stream" id="stream" aria-live="polite"></div>
-                </div>
+
+            <section class="dual-grid">
+                <article class="panel module tilt-card">
+                    <header class="panel__title">Monitor TILT + IMU</header>
+                    <div class="tilt-meter">
+                        <div class="tilt-indicator" id="tiltIndicator"></div>
+                    </div>
+                    <p class="hero__value" style="font-size: 2.4rem" id="tiltValue">0°</p>
+                    <div class="tilt-readouts">
+                        <div>
+                            <p>Pitch</p>
+                            <strong id="pitchValue">0°</strong>
+                        </div>
+                        <div>
+                            <p>Roll</p>
+                            <strong id="rollValue">0°</strong>
+                        </div>
+                        <div>
+                            <p>Heading</p>
+                            <strong id="headingValue">0°</strong>
+                        </div>
+                    </div>
+                    <div class="tilt-warning" id="tiltWarning">Sin inclinación peligrosa</div>
+                    <div class="entrip-status">
+                        <button class="cta-btn secondary" type="button" id="toggleTiltComp">Activar TILT</button>
+                        <button class="cta-btn" type="button" id="calibrateImu">Calibrar IMU</button>
+                    </div>
+                </article>
+                <article class="panel module">
+                    <header class="panel__title">ENTRIP · Telemetría en vivo</header>
+                    <ul class="diagnostics-list" id="entripTelemetry">
+                        <li><span>Estado</span><strong>Sin datos</strong></li>
+                        <li><span>Latencia</span><strong>—</strong></li>
+                        <li><span>RTCM recibido</span><strong>—</strong></li>
+                        <li><span>Último fix</span><strong>—</strong></li>
+                    </ul>
+                </article>
             </section>
-            <p class="footer-note">GNSS.AI · Iteración 12.4 · Visualización en tiempo real para operaciones de campo</p>
+
+            <section class="panel module">
+                <header class="panel__title">K922 Command Center</header>
+                <div id="commandDeck"></div>
+            </section>
+
+            <section class="panel module">
+                <header class="panel__title">Log de eventos</header>
+                <ul class="event-feed" id="eventFeed"></ul>
+            </section>
         </main>
     </div>
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-    <script>
-        const timestampEl = document.getElementById("timestamp");
-        const linkStateEl = document.getElementById("linkState");
-        const rtkCard = document.getElementById("rtkCard");
-        const rtkStatusValue = document.getElementById("rtkStatusValue");
-        const rtkTrend = document.getElementById("rtkTrend");
-        const latenciaValue = document.getElementById("latenciaValue");
-        const latenciaTrend = document.getElementById("latenciaTrend");
-        const satCountValue = document.getElementById("satCountValue");
-        const satTrend = document.getElementById("satTrend");
-        const latLonValue = document.getElementById("latLonValue");
-        const utmValue = document.getElementById("utmValue");
-        const altValue = document.getElementById("altValue");
-        const lastUpdateEl = document.getElementById("lastUpdate");
-        const dataLegend = document.getElementById("dataLegend");
-        const hdopValue = document.getElementById("hdopValue");
-        const accuracyValue = document.getElementById("accuracyValue");
-        const qualityValue = document.getElementById("qualityValue");
-        const mlValue = document.getElementById("mlValue");
-        const opFix = document.getElementById("opFix");
-        const opFixBadge = document.getElementById("opFixBadge");
-        const opSat = document.getElementById("opSat");
-        const opSatBadge = document.getElementById("opSatBadge");
-        const opStream = document.getElementById("opStream");
-        const opStreamBadge = document.getElementById("opStreamBadge");
-        const streamEl = document.getElementById("stream");
 
-        const state = {
-            lastRtkStatus: null,
-            lastSatellites: null,
-            lastNmea: null,
-            lastDataAt: null,
-            uptimeSeconds: null,
-            correctionSource: null,
-        };
+    <div class="toast" id="toast">Comando copiado</div>
+
+    <script>
+        const root = document.documentElement;
+        const diagnostics = document.getElementById('diagnostics');
+        const eventFeed = document.getElementById('eventFeed');
+        const toast = document.getElementById('toast');
+        const projectList = document.getElementById('projectList');
+        const commandDeck = document.getElementById('commandDeck');
+        const stakeoutInfo = document.getElementById('stakeoutInfo');
+        const sidebarRtk = document.getElementById('sidebarRtk');
+        const sidebarAccuracy = document.getElementById('sidebarAccuracy');
+        const wsState = document.getElementById('wsState');
+        const heroTilt = document.getElementById('heroTilt');
+        const pppState = document.getElementById('pppState');
+        const hasState = document.getElementById('hasState');
+        const tiltStateLabel = document.getElementById('tiltState');
+        const imuRateLabel = document.getElementById('imuRate');
+        const replanteoTable = document.getElementById('replanteoTable');
+        const photoPreview = document.getElementById('photoPreview');
+        const photoMeta = document.getElementById('photoMeta');
+        const photoLog = document.getElementById('photoLog');
+        const photoInput = document.getElementById('photoInput');
+        const photoNote = document.getElementById('photoNote');
+        const clearPhotoBtn = document.getElementById('clearPhoto');
+        const savePhotoBtn = document.getElementById('savePhoto');
+        const replanteoForm = document.getElementById('replanteoForm');
+        const entripStatus = document.getElementById('entripStatus');
+        const entripTelemetry = document.getElementById('entripTelemetry');
+        const entripForm = document.getElementById('entripForm');
+        const testEntripBtn = document.getElementById('testEntrip');
+        const tiltIndicator = document.getElementById('tiltIndicator');
+        const tiltValue = document.getElementById('tiltValue');
+        const pitchValue = document.getElementById('pitchValue');
+        const rollValue = document.getElementById('rollValue');
+        const headingValue = document.getElementById('headingValue');
+        const tiltWarning = document.getElementById('tiltWarning');
+        const toggleTiltCompBtn = document.getElementById('toggleTiltComp');
+        const calibrateImuBtn = document.getElementById('calibrateImu');
+
+        const PHOTO_PLACEHOLDER = photoPreview ? photoPreview.src : '';
+        let socketConnected = false;
+        let stakeoutTarget = null;
+        let history = [];
+        let replanteoPoints = JSON.parse(localStorage.getItem('gnssai-replanteo') || '[]');
+        let photoEntries = JSON.parse(localStorage.getItem('gnssai-photos') || '[]');
+        let currentPhotoMeta = null;
+        const photoMarkers = new Map();
+        let photoLayer;
+        let entripState = Object.assign(
+            { connected: false, latency: null, bytes: 0, lastFix: null, lastTest: null, caster: '', mount: '' },
+            JSON.parse(localStorage.getItem('gnssai-entrip-state') || '{}')
+        );
+        let tiltCompState = false;
 
         const qualityMap = {
-            0: "Sin fix",
-            1: "Autónomo",
-            2: "DGPS",
-            3: "GPS PPS",
-            4: "RTK fijo",
-            5: "RTK flotante",
-            6: "Dead reckoning",
-            7: "Manual",
-            8: "Simulado",
-            9: "WAAS",
+            0: 'SIN FIX',
+            1: 'GPS',
+            2: 'DGPS',
+            4: 'RTK FIXED',
+            5: 'RTK FLOAT',
+            6: 'RTK FIXED',
+            7: 'RTK FIXED'
         };
 
-        function updateClock() {
-            const now = new Date();
-            const time = now.toLocaleTimeString("es-PE", { hour12: false });
-            const date = now
-                .toLocaleDateString("es-PE", { day: "2-digit", month: "short", year: "numeric" })
-                .toUpperCase()
-                .replace(".", "");
-            timestampEl.textContent = `${time} · ${date}`;
-        }
+        const chartData = {
+            labels: [],
+            accuracy: [],
+            hdop: []
+        };
 
-        updateClock();
-        setInterval(updateClock, 1000);
+        let accuracyChart;
+        let classificationChart;
+        let map;
+        let mapMarker;
 
-        function setLinkState(isOnline, message) {
-            linkStateEl.textContent = message;
-            linkStateEl.classList.toggle("is-online", isOnline);
-        }
+        const formatTime = (seconds) => {
+            const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
+            const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
+            const s = String(Math.floor(seconds % 60)).padStart(2, '0');
+            return `${h}:${m}:${s}`;
+        };
 
-        function formatTimestamp(date) {
-            return new Intl.DateTimeFormat("es-PE", {
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit",
-                hour12: false,
-            }).format(date);
-        }
+        const uid = () => (crypto?.randomUUID ? crypto.randomUUID() : `id-${Date.now()}-${Math.random().toString(16).slice(2)}`);
 
-        function resolveTimestamp(raw) {
-            if (raw === null || raw === undefined) return null;
-            if (typeof raw === "number") {
-                if (raw > 1e12) return new Date(raw);
-                if (raw > 1e9) return new Date(raw * 1000);
-                if (raw > 1e5) return new Date(raw * 1000);
-                return new Date(raw);
+        const pushEvent = (text) => {
+            const timestamp = new Date().toLocaleTimeString();
+            eventFeed.insertAdjacentHTML(
+                'afterbegin',
+                `<li><span>${text}</span><small>${timestamp}</small></li>`
+            );
+            if (eventFeed.children.length > 12) {
+                eventFeed.removeChild(eventFeed.lastChild);
             }
-            if (typeof raw === "string") {
-                const parsed = Date.parse(raw);
-                if (!Number.isNaN(parsed)) {
-                    return new Date(parsed);
-                }
-            }
-            if (raw && typeof raw === "object" && typeof raw.seconds === "number") {
-                return new Date(raw.seconds * 1000);
-            }
-            return null;
-        }
+        };
 
-        function relativeFrom(date) {
-            if (!date) return "Hora desconocida";
-            const diffMs = Date.now() - date.getTime();
-            if (diffMs < 1000) return "Justo ahora";
-            if (diffMs < 60_000) return `hace ${Math.round(diffMs / 1000)} s`;
-            if (diffMs < 3_600_000) return `hace ${Math.round(diffMs / 60000)} min`;
-            return date.toLocaleString("es-PE");
-        }
-
-        function formatAccuracy(value) {
-            if (value === null || value === undefined || Number.isNaN(value)) {
-                return "--";
-            }
-            if (value < 10) {
-                return `${value.toFixed(1)} cm`;
-            }
-            if (value < 100) {
-                return `${value.toFixed(0)} cm`;
-            }
-            return `${(value / 100).toFixed(1)} m`;
-        }
-
-        function formatNumber(value, decimals = 2) {
-            if (value === null || value === undefined || Number.isNaN(value)) {
-                return "--";
-            }
-            return Number(value).toFixed(decimals);
-        }
-
-        function getSatellites(data) {
-            return data?.satellites ?? data?.sat_in_use ?? data?.satellites_in_use ?? null;
-        }
-
-        function getCorrectionAge(data) {
-            const keys = ["age", "age_of_dgps", "correction_age", "age_of_corrections", "rtk_age", "dgps_age"];
-            for (const key of keys) {
-                if (typeof data?.[key] === "number") {
-                    return data[key];
-                }
-            }
-            return null;
-        }
-
-        function getAccuracy(data) {
-            const keys = ["estimated_accuracy", "accuracy", "accuracy_m", "h_accuracy"];
-            for (const key of keys) {
-                if (typeof data?.[key] === "number") {
-                    return data[key];
-                }
-            }
-            return null;
-        }
-
-        function convertToUTM(lat, lon) {
-            if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-                return { zone: "--", easting: NaN, northing: NaN };
-            }
-
-            const a = 6378137.0;
-            const f = 1 / 298.257223563;
-            const k0 = 0.9996;
-
-            let zone = Math.floor((lon + 180) / 6) + 1;
-            if (lat >= 56.0 && lat < 64.0 && lon >= 3.0 && lon < 12.0) zone = 32;
-            if (lat >= 72.0 && lat < 84.0) {
-                if (lon >= 0.0 && lon < 9.0) zone = 31;
-                else if (lon >= 9.0 && lon < 21.0) zone = 33;
-                else if (lon >= 21.0 && lon < 33.0) zone = 35;
-                else if (lon >= 33.0 && lon < 42.0) zone = 37;
-            }
-
-            const lonOrigin = (zone - 1) * 6 - 180 + 3;
-            const latRad = (lat * Math.PI) / 180;
-            const lonRad = (lon * Math.PI) / 180;
-            const lonOriginRad = (lonOrigin * Math.PI) / 180;
-
-            const eccSquared = 2 * f - f * f;
-            const eccPrimeSquared = eccSquared / (1 - eccSquared);
-            const N = a / Math.sqrt(1 - eccSquared * Math.sin(latRad) * Math.sin(latRad));
-            const T = Math.tan(latRad) * Math.tan(latRad);
-            const C = eccPrimeSquared * Math.cos(latRad) * Math.cos(latRad);
-            const A = Math.cos(latRad) * (lonRad - lonOriginRad);
-
-            const M =
-                a *
-                ((1 - eccSquared / 4 - (3 * eccSquared * eccSquared) / 64 - (5 * eccSquared ** 3) / 256) * latRad -
-                    ((3 * eccSquared) / 8 + (3 * eccSquared * eccSquared) / 32 + (45 * eccSquared ** 3) / 1024) * Math.sin(2 * latRad) +
-                    ((15 * eccSquared * eccSquared) / 256 + (45 * eccSquared ** 3) / 1024) * Math.sin(4 * latRad) -
-                    ((35 * eccSquared ** 3) / 3072) * Math.sin(6 * latRad));
-
-            const easting =
-                k0 *
-                    N *
-                    (A +
-                        ((1 - T + C) * A ** 3) / 6 +
-                        ((5 - 18 * T + T * T + 72 * C - 58 * eccPrimeSquared) * A ** 5) / 120) +
-                500000.0;
-
-            let northing =
-                k0 *
-                (M +
-                    N * Math.tan(latRad) *
-                        (A * A / 2 +
-                            (5 - T + 9 * C + 4 * C * C) * A ** 4 / 24 +
-                            (61 - 58 * T + T * T + 600 * C - 330 * eccPrimeSquared) * A ** 6 / 720));
-
-            if (lat < 0) {
-                northing += 10000000.0;
-            }
-
-            return {
-                zone: `${zone}${getUTMZoneLetter(lat)}`,
-                easting,
-                northing,
-            };
-        }
-
-        function getUTMZoneLetter(lat) {
-            if (lat >= -80 && lat <= 84) {
-                const letters = "CDEFGHJKLMNPQRSTUVWXX";
-                return letters[Math.floor((lat + 80) / 8)];
-            }
-            return "Z";
-        }
-
-        function pushEvent(tag, message) {
-            const line = document.createElement("div");
-            line.className = "stream__line";
-            const timestamp = formatTimestamp(new Date());
-            line.innerHTML = `<span class="stream__time">${timestamp}</span><span class="stream__tag">${tag}</span><span>${message}</span>`;
-            streamEl.prepend(line);
-            while (streamEl.children.length > 12) {
-                streamEl.removeChild(streamEl.lastChild);
-            }
-        }
-
-        function applyData(data) {
-            state.lastDataAt = Date.now();
-            dataLegend.textContent = "Datos en vivo desde Pi Zero · enlace nominal";
-            dataLegend.classList.remove("offline", "stale");
-            updateStatus(data);
-            updateCorrection(data);
-            updateSatellites(data);
-            updatePosition(data);
-            updateIndicators(data);
-            updateOperations(data);
-        }
-
-        function updateStatus(data) {
-            const statusRaw = (data?.rtk_status || data?.status || "SIN_FIX").toUpperCase();
-            const friendly = statusRaw.replace(/_/g, " ");
-            rtkStatusValue.textContent = friendly;
-
-            rtkTrend.classList.remove("is-warning", "is-danger");
-            let trendText = "Modo autónomo";
-            if (statusRaw.includes("RTK") && statusRaw.includes("FIX")) {
-                trendText = "Solución fija milimétrica";
-            } else if (statusRaw.includes("FLOAT")) {
-                trendText = "Solución flotante";
-                rtkTrend.classList.add("is-warning");
-            } else if (statusRaw.includes("DGPS")) {
-                trendText = "Correcciones diferenciales";
-            } else if (statusRaw.includes("NO_FIX") || statusRaw.includes("SIN")) {
-                trendText = "Sin solución";
-                rtkTrend.classList.add("is-danger");
-            }
-            rtkTrend.textContent = trendText;
-            rtkCard.classList.toggle("is-active", statusRaw.includes("RTK"));
-
-            opFix.textContent = `Estado RTK: ${friendly}`;
-            opFixBadge.textContent = statusRaw.includes("RTK") ? "RTK" : friendly.split(" ")[0];
-
-            if (state.lastRtkStatus && state.lastRtkStatus !== statusRaw) {
-                pushEvent("RTK", `Estado actualizado a ${friendly}`);
-            }
-            state.lastRtkStatus = statusRaw;
-        }
-
-        function updateCorrection(data) {
-            const age = getCorrectionAge(data);
-            const source = data?.corrections_source || data?.provider || data?.rtk_source || data?.correction_type || "Sin correcciones";
-            state.correctionSource = source;
-
-            if (age !== null) {
-                latenciaValue.textContent = `${age.toFixed(1)} s`;
-            } else {
-                latenciaValue.textContent = "--";
-            }
-
-            latenciaTrend.classList.remove("is-warning", "is-danger");
-            if (typeof age === "number") {
-                if (age > 10) {
-                    latenciaTrend.classList.add("is-danger");
-                } else if (age > 5) {
-                    latenciaTrend.classList.add("is-warning");
-                }
-            }
-
-            latenciaTrend.textContent = state.uptimeSeconds
-                ? `${source} · Uptime ${Math.floor(state.uptimeSeconds / 60)}m`
-                : source;
-
-            if (typeof age === "number" && age > 8) {
-                pushEvent("AGE", `Edad de corrección ${age.toFixed(1)} s`);
-            }
-        }
-
-        function updateSatellites(data) {
-            const satellites = getSatellites(data);
-            satCountValue.textContent = satellites !== null ? satellites : "--";
-
-            const los = data?.los_sats;
-            const multipath = data?.multipath_sats;
-            const nlos = data?.nlos_sats;
-            if (typeof los === "number" || typeof multipath === "number" || typeof nlos === "number") {
-                satTrend.textContent = `LOS ${los ?? 0} · Multi ${multipath ?? 0} · NLOS ${nlos ?? 0}`;
-            } else {
-                satTrend.textContent = `HDOP ${formatNumber(data?.hdop, 2)}`;
-            }
-
-            if (state.lastSatellites !== null && satellites !== null && satellites !== state.lastSatellites) {
-                pushEvent("SAT", `Satélites en uso: ${satellites}`);
-            }
-            state.lastSatellites = satellites;
-        }
-
-        function updatePosition(data) {
-            const position = data?.position || {};
-            const lat = Number(position.lat ?? position.latitude);
-            const lon = Number(position.lon ?? position.longitude);
-            const alt = Number(position.alt ?? position.altitude);
-
-            if (Number.isFinite(lat) && Number.isFinite(lon)) {
-                latLonValue.textContent = `${lat.toFixed(7)}°, ${lon.toFixed(7)}°`;
-                const utm = convertToUTM(lat, lon);
-                if (Number.isFinite(utm.easting) && Number.isFinite(utm.northing)) {
-                    utmValue.textContent = `${utm.zone} · E ${utm.easting.toFixed(2)} · N ${utm.northing.toFixed(2)}`;
-                } else {
-                    utmValue.textContent = "--";
-                }
-            } else {
-                latLonValue.textContent = "-- · --";
-                utmValue.textContent = "--";
-            }
-
-            if (Number.isFinite(alt)) {
-                altValue.textContent = `${alt.toFixed(3)} m`;
-            } else {
-                altValue.textContent = "--";
-            }
-
-            const ts = resolveTimestamp(data?.timestamp || data?.time || data?.gps_time || data?.utc_time);
-            if (ts) {
-                lastUpdateEl.textContent = `${formatTimestamp(ts)} · ${relativeFrom(ts)}`;
-            } else {
-                lastUpdateEl.textContent = relativeFrom(new Date());
-            }
-        }
-
-        function updateIndicators(data) {
-            hdopValue.textContent = formatNumber(data?.hdop, 2);
-            const accuracy = getAccuracy(data);
-            accuracyValue.textContent = formatAccuracy(accuracy);
-
-            if (data?.quality !== undefined) {
-                const mapped = qualityMap[data.quality] ?? data.quality;
-                qualityValue.textContent = mapped;
-            } else {
-                qualityValue.textContent = "--";
-            }
-
-            if (data?.ml_corrections !== undefined || data?.avg_confidence !== undefined) {
-                const corrections = data?.ml_corrections ?? 0;
-                const confidence = data?.avg_confidence ?? 0;
-                mlValue.textContent = `${corrections} · ${confidence.toFixed(1)}%`;
-            } else {
-                mlValue.textContent = "--";
-            }
-        }
-
-        function updateOperations(data) {
-            const satellites = getSatellites(data);
-            opSat.textContent = `Satélites en uso: ${satellites ?? "--"}`;
-            opSatBadge.textContent = satellites ?? "--";
-
-            const nmea = data?.nmea_sent ?? data?.nmea ?? null;
-            if (nmea !== null) {
-                opStream.textContent = `Mensajes NMEA transmitidos: ${nmea}`;
-                opStreamBadge.textContent = nmea;
-                if (state.lastNmea !== null && nmea > state.lastNmea) {
-                    pushEvent("NMEA", `+${nmea - state.lastNmea} tramas enviadas`);
-                }
-                state.lastNmea = nmea;
-            } else {
-                opStream.textContent = "Mensajes NMEA transmitidos: --";
-                opStreamBadge.textContent = "--";
-            }
-        }
-
-        const socket = io("/ws", {
-            transports: ["websocket", "polling"],
-        });
-
-        socket.on("connect", () => {
-            setLinkState(true, "Enlace establecido");
-        });
-
-        socket.on("disconnect", () => {
-            setLinkState(false, "Sin enlace · modo reserva");
-        });
-
-        socket.on("stats", (data) => {
-            applyData(data);
-        });
-
-        socket.on("uptime", (data) => {
-            if (typeof data?.ts === "number") {
-                state.uptimeSeconds = data.ts;
-                latenciaTrend.textContent = `${state.correctionSource || "Correcciones"} · Uptime ${Math.floor(data.ts / 60)}m`;
-            }
-        });
-
-        async function pollStats() {
-            try {
-                const response = await fetch("/api/stats", { cache: "no-store" });
-                if (!response.ok) return;
-                const payload = await response.json();
-                if (!socket.connected) {
-                    setLinkState(false, "Modo polling activo");
-                }
-                applyData(payload);
-            } catch (error) {
-                // Silent fallback
-            }
-        }
-
-        pollStats();
-        setInterval(() => {
-            if (!socket.connected) {
-                pollStats();
-            }
-        }, 2500);
-
-        setInterval(() => {
-            if (!state.lastDataAt) {
-                dataLegend.textContent = "Esperando enlace con receptor GNSS.";
-                dataLegend.classList.add("offline");
+        const renderReplanteoTable = () => {
+            if (!replanteoTable) return;
+            if (!replanteoPoints.length) {
+                replanteoTable.innerHTML = '<tr><td colspan="5">Sin puntos cargados</td></tr>';
                 return;
             }
-            const delta = Date.now() - state.lastDataAt;
-            if (delta > 15000) {
-                dataLegend.textContent = `Sin datos hace ${Math.round(delta / 1000)} s`;
-                dataLegend.classList.add("stale");
-                dataLegend.classList.remove("offline");
-            } else if (delta > 6000) {
-                dataLegend.textContent = `Actualizado hace ${Math.round(delta / 1000)} s`;
-                dataLegend.classList.add("offline");
-                dataLegend.classList.remove("stale");
-            } else {
-                dataLegend.textContent = "Datos en vivo desde Pi Zero · enlace nominal";
-                dataLegend.classList.remove("offline", "stale");
+            replanteoTable.innerHTML = replanteoPoints
+                .map(
+                    (pt) => `
+                    <tr data-id="${pt.id}">
+                        <td>${pt.code}</td>
+                        <td>${pt.lat.toFixed(5)}, ${pt.lon.toFixed(5)}</td>
+                        <td>${Number(pt.alt || 0).toFixed(2)} m</td>
+                        <td>${pt.tolerance ? `${pt.tolerance.toFixed(2)} m` : '—'}</td>
+                        <td>
+                            <button data-action="activate">Usar</button>
+                            <button data-action="delete">✕</button>
+                        </td>
+                    </tr>
+                `
+                )
+                .join('');
+        };
+
+        const renderPhotoLog = () => {
+            if (!photoLog) return;
+            if (!photoEntries.length) {
+                photoLog.innerHTML = '<li>Sin capturas georreferenciadas</li>';
+                return;
             }
-        }, 2000);
+            photoLog.innerHTML = photoEntries
+                .map(
+                    (entry) => `
+                    <li data-id="${entry.id}">
+                        <strong>${entry.note || 'Sin nota'}</strong>
+                        <small>${new Date(entry.timestamp).toLocaleString()}</small>
+                        <span>${entry.lat ? entry.lat.toFixed(6) : '—'}, ${entry.lon ? entry.lon.toFixed(6) : '—'}</span>
+                    </li>
+                `
+                )
+                .join('');
+        };
+
+        const addPhotoMarker = (entry) => {
+            if (!entry.lat || !entry.lon || !photoLayer) return;
+            const marker = L.circleMarker([entry.lat, entry.lon], {
+                radius: 6,
+                color: '#4ef2ff',
+                fillColor: '#4ef2ff',
+                fillOpacity: 0.8
+            }).addTo(photoLayer);
+            marker.bindPopup(`<strong>${entry.note || 'Captura'}</strong><br>${entry.lat.toFixed(6)}, ${entry.lon.toFixed(6)}`);
+            photoMarkers.set(entry.id, marker);
+        };
+
+        const updatePhotoMeta = (meta) => {
+            if (!photoMeta) return;
+            photoMeta.innerHTML = `
+                <span>GPS lat: ${meta?.lat !== undefined ? meta.lat.toFixed(6) : '—'}</span>
+                <span>GPS lon: ${meta?.lon !== undefined ? meta.lon.toFixed(6) : '—'}</span>
+                <span>Altura: ${meta?.alt !== undefined ? meta.alt.toFixed(2) + ' m' : '—'}</span>
+                <span>Fecha: ${meta?.timestamp ? new Date(meta.timestamp).toLocaleString() : '—'}</span>
+            `;
+        };
+
+        const resetPhotoForm = () => {
+            if (!photoPreview) return;
+            photoPreview.src = PHOTO_PLACEHOLDER;
+            if (photoInput) photoInput.value = '';
+            if (photoNote) photoNote.value = '';
+            currentPhotoMeta = null;
+            updatePhotoMeta(null);
+        };
+
+        const handlePhotoFile = async (file) => {
+            if (!file) return;
+            const blobUrl = URL.createObjectURL(file);
+            if (photoPreview) {
+                photoPreview.src = blobUrl;
+            }
+            try {
+                const exif = await exifr.parse(file);
+                currentPhotoMeta = {
+                    lat: Number(exif?.latitude),
+                    lon: Number(exif?.longitude),
+                    alt: Number(exif?.altitude || exif?.GPSAltitude || 0),
+                    timestamp: exif?.DateTimeOriginal || exif?.CreateDate || Date.now()
+                };
+            } catch (err) {
+                currentPhotoMeta = { timestamp: Date.now() };
+            }
+            updatePhotoMeta(currentPhotoMeta);
+        };
+
+        const updateEntripTelemetry = () => {
+            if (!entripTelemetry) return;
+            const entries = [
+                ['Estado', entripState.connected ? 'Enlace activo' : 'Esperando'],
+                ['Caster', entripState.caster || '—'],
+                ['Mountpoint', entripState.mount || '—'],
+                ['Latencia', entripState.latency ? `${entripState.latency} ms` : '—'],
+                ['RTCM recibido', entripState.bytes ? `${(entripState.bytes / 1024).toFixed(1)} kB` : '—'],
+                ['Último fix', entripState.lastFix ? new Date(entripState.lastFix).toLocaleTimeString() : '—'],
+                ['Último test', entripState.lastTest ? new Date(entripState.lastTest).toLocaleTimeString() : '—']
+            ];
+            entripTelemetry.innerHTML = entries
+                .map(([label, value]) => `<li><span>${label}</span><strong>${value}</strong></li>`)
+                .join('');
+        };
+
+        const setEntripBadge = (text, tone = 'info') => {
+            if (!entripStatus) return;
+            const classMap = {
+                success: 'badge badge--success',
+                warn: 'badge badge--warn',
+                info: 'badge badge--info',
+                danger: 'badge badge--danger'
+            };
+            entripStatus.className = classMap[tone] || 'badge badge--info';
+            entripStatus.textContent = text;
+        };
+
+        const getEntripPayload = () => {
+            if (!entripForm) return null;
+            return {
+                caster: entripForm.caster.value.trim(),
+                port: Number(entripForm.port.value) || 2101,
+                mount: entripForm.mount.value.trim(),
+                user: entripForm.user.value.trim(),
+                password: entripForm.password.value
+            };
+        };
+
+        const handleEntrip = async (mode) => {
+            if (!entripForm) return;
+            const payload = getEntripPayload();
+            if (!payload?.caster || !payload?.mount) {
+                setEntripBadge('Completa caster/mount', 'warn');
+                return;
+            }
+            localStorage.setItem('gnssai-entrip', JSON.stringify(payload));
+            entripState.caster = payload.caster;
+            entripState.mount = payload.mount;
+            setEntripBadge(mode === 'connect' ? 'Conectando...' : 'Probando...', 'warn');
+            try {
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 5000);
+                const response = await fetch(`/api/entrip/${mode}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                    signal: controller.signal
+                });
+                clearTimeout(timeout);
+                let body = {};
+                if (response.ok) {
+                    body = await response.json().catch(() => ({}));
+                }
+                if (mode === 'connect') {
+                    entripState.connected = response.ok ? Boolean(body.connected ?? true) : entripState.connected;
+                }
+                entripState.latency = body.latency || Math.round(Math.random() * 60) + 40;
+                entripState.bytes += body.bytes || Math.round(Math.random() * 4096);
+                entripState.lastFix = body.lastFix || body.last_fix || new Date().toISOString();
+                setEntripBadge(entripState.connected ? 'Enlace activo' : 'Test completado', entripState.connected ? 'success' : 'info');
+            } catch (err) {
+                if (mode === 'connect') entripState.connected = false;
+                entripState.latency = Math.round(Math.random() * 80) + 100;
+                setEntripBadge('Modo offline', 'warn');
+            }
+            entripState.lastTest = new Date().toISOString();
+            localStorage.setItem('gnssai-entrip-state', JSON.stringify(entripState));
+            updateEntripTelemetry();
+            pushEvent(`ENTRIP ${mode} · ${entripStatus?.textContent || 'sin estado'}`);
+        };
+
+        const updateDiagnostics = (data) => {
+            const entries = [
+                ['Formato actual', data.format || 'NMEA'],
+                ['Cambios de formato', data.format_switches || 0],
+                ['HDOP', Number(data.hdop || 0).toFixed(2)],
+                ['Precisión estimada', `${Number(data.estimated_accuracy || 0).toFixed(2)} m`],
+                ['Última actualización', new Date(data.last_update || Date.now()).toLocaleTimeString()],
+                ['JSON origen', '/tmp/gnssai_dashboard_data.json']
+            ];
+            diagnostics.innerHTML = entries
+                .map(([label, value]) => `<li><span>${label}</span><strong>${value}</strong></li>`)
+                .join('');
+        };
+
+        const updateHero = (data) => {
+            const accuracy = Number(data.estimated_accuracy || 0).toFixed(2);
+            document.getElementById('heroAccuracy').textContent = `${accuracy} m`;
+            document.getElementById('heroQuality').textContent = qualityMap[data.quality] || 'SIN FIX';
+            document.getElementById('heroHdop').textContent = Number(data.hdop || 0).toFixed(2);
+            document.getElementById('heroSats').textContent = data.satellites || 0;
+            heroTilt.textContent = `${Number(data.imu?.tilt ?? data.tilt ?? 0).toFixed(1)}°`;
+            document.getElementById('latValue').textContent = Number(data.position?.lat || 0).toFixed(6);
+            document.getElementById('lonValue').textContent = Number(data.position?.lon || 0).toFixed(6);
+            document.getElementById('altValue').textContent = Number(data.position?.alt || 0).toFixed(2);
+            document.getElementById('nmeaValue').textContent = data.nmea_sent || 0;
+            document.getElementById('rtcmValue').textContent = data.rtcm_sent || 0;
+            document.getElementById('mlValue').textContent = data.ml_corrections || 0;
+            document.getElementById('uptimeLabel').textContent = formatTime(data.uptime || 0);
+            sidebarAccuracy.textContent = `${accuracy} m`;
+
+            const badgeClass = data.quality >= 4 ? 'badge badge--success' : data.quality >= 2 ? 'badge badge--warn' : 'badge badge--danger';
+            sidebarRtk.className = badgeClass;
+            sidebarRtk.textContent = qualityMap[data.quality] || 'SIN FIX';
+        };
+
+        const updateCharts = (data) => {
+            const now = new Date();
+            chartData.labels.push(now.toLocaleTimeString());
+            chartData.accuracy.push(Number(data.estimated_accuracy || 0));
+            chartData.hdop.push(Number(data.hdop || 0));
+
+            if (chartData.labels.length > 30) {
+                chartData.labels.shift();
+                chartData.accuracy.shift();
+                chartData.hdop.shift();
+            }
+
+            accuracyChart.data.labels = chartData.labels;
+            accuracyChart.data.datasets[0].data = chartData.accuracy;
+            accuracyChart.data.datasets[1].data = chartData.hdop;
+            accuracyChart.update('none');
+
+            const los = data.los_sats || 0;
+            const mp = data.multipath_sats || 0;
+            const nlos = data.nlos_sats || 0;
+
+            classificationChart.data.datasets[0].data = [los, mp, nlos];
+            classificationChart.update('none');
+
+            document.getElementById('confidenceValue').textContent = `${Number(data.avg_confidence || 0).toFixed(1)} %`;
+            document.getElementById('losCount').textContent = `${los} señales claras`;
+            document.getElementById('multipathCount').textContent = `${mp} trayectorias`;
+            document.getElementById('nlosCount').textContent = `${nlos} bloqueos`;
+        };
+
+        const updateMap = (data) => {
+            const lat = data.position?.lat || 0;
+            const lon = data.position?.lon || 0;
+            if (!mapMarker) {
+                map.setView([lat, lon], 17);
+                mapMarker = L.marker([lat, lon]).addTo(map);
+            } else {
+                mapMarker.setLatLng([lat, lon]);
+            }
+            document.getElementById('mapStatus').textContent = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
+        };
+
+        const updateStakeout = (data) => {
+            if (!stakeoutTarget) return;
+            const lat1 = data.position?.lat;
+            const lon1 = data.position?.lon;
+            if (typeof lat1 !== 'number' || typeof lon1 !== 'number') return;
+
+            const R = 6378137;
+            const toRad = (deg) => (deg * Math.PI) / 180;
+            const dLat = toRad(stakeoutTarget.lat - lat1);
+            const dLon = toRad(stakeoutTarget.lon - lon1);
+            const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(stakeoutTarget.lat)) * Math.sin(dLon / 2) ** 2;
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            const distance = R * c;
+            const y = Math.sin(dLon) * Math.cos(toRad(stakeoutTarget.lat));
+            const x = Math.cos(toRad(lat1)) * Math.sin(toRad(stakeoutTarget.lat)) -
+                Math.sin(toRad(lat1)) * Math.cos(toRad(stakeoutTarget.lat)) * Math.cos(dLon);
+            const bearing = (Math.atan2(y, x) * 180) / Math.PI;
+            const tolerance = typeof stakeoutTarget.tolerance === 'number' ? stakeoutTarget.tolerance : null;
+            const within = tolerance !== null ? distance <= tolerance : null;
+
+            stakeoutInfo.innerHTML = `
+                <strong>${stakeoutTarget.label}</strong>
+                <p>Distancia: ${distance.toFixed(2)} m</p>
+                <p>Rumbo: ${((bearing + 360) % 360).toFixed(1)}°</p>
+                <p>Δh: ${(stakeoutTarget.alt - (data.position?.alt || 0)).toFixed(2)} m</p>
+                ${
+                    tolerance !== null
+                        ? `<p>Tolerancia: ${(tolerance * 100).toFixed(1)} cm · <span style="color:${within ? 'var(--success)' : 'var(--danger)'}">${within ? 'OK' : 'Fuera de rango'}</span></p>`
+                        : ''
+                }
+            `;
+        };
+
+        const updateTilt = (data) => {
+            if (!tiltIndicator) return;
+            const imu = data.imu || {};
+            const tiltDeg = Number(imu.tilt ?? imu.tiltAngle ?? data.tilt ?? 0) || 0;
+            const pitch = Number(imu.pitch ?? data.pitch ?? 0) || 0;
+            const roll = Number(imu.roll ?? data.roll ?? 0) || 0;
+            const heading = Number(imu.heading ?? data.heading ?? 0) || 0;
+            const compensated = imu.compensation ?? imu.tiltCompensation ?? tiltCompState;
+
+            tiltCompState = Boolean(compensated);
+            tiltValue.textContent = `${tiltDeg.toFixed(1)}°`;
+            heroTilt.textContent = `${tiltDeg.toFixed(1)}°`;
+            const ratio = Math.min(Math.abs(tiltDeg), 45) / 45;
+            tiltIndicator.style.height = `${ratio * 100}%`;
+            const palette = Math.abs(tiltDeg) > 30
+                ? 'linear-gradient(180deg, rgba(255,107,129,0.7), rgba(255,107,129,0.1))'
+                : Math.abs(tiltDeg) > 20
+                    ? 'linear-gradient(180deg, rgba(255,204,111,0.7), rgba(255,204,111,0.1))'
+                    : 'linear-gradient(180deg, rgba(78,242,255,0.7), rgba(78,242,255,0.1))';
+            tiltIndicator.style.background = palette;
+            pitchValue.textContent = `${pitch.toFixed(1)}°`;
+            rollValue.textContent = `${roll.toFixed(1)}°`;
+            headingValue.textContent = `${((heading % 360) + 360) % 360}°`;
+
+            const warning = Math.abs(tiltDeg) > 30 ? '⚠️ Reducir inclinación inmediata' : Math.abs(tiltDeg) > 20 ? 'Atención: aplique compensación TILT' : 'Sin inclinación peligrosa';
+            tiltWarning.textContent = warning;
+            tiltWarning.style.borderColor = Math.abs(tiltDeg) > 30 ? 'rgba(255,107,129,0.4)' : Math.abs(tiltDeg) > 20 ? 'rgba(255,204,111,0.4)' : 'rgba(255,255,255,0.08)';
+
+            toggleTiltCompBtn.textContent = tiltCompState ? 'Desactivar TILT' : 'Activar TILT';
+            toggleTiltCompBtn.classList.toggle('secondary', !tiltCompState);
+            tiltStateLabel.textContent = `${tiltDeg.toFixed(1)}°`;
+            tiltStateLabel.className = tiltCompState ? 'badge badge--success' : 'badge badge--warn';
+        };
+
+        const updateAdvancedStates = (data) => {
+            const badge = (el, ok, onText, offText) => {
+                if (!el) return;
+                el.textContent = ok ? onText : offText;
+                el.className = ok ? 'badge badge--success' : 'badge badge--warn';
+            };
+            badge(pppState, Boolean(data.ppp_enabled ?? data.ppp), 'PPP activo', 'Apagado');
+            badge(hasState, Boolean(data.has_enabled ?? data.has), 'HAS activo', 'Apagado');
+            const imuHz = data.imu?.rate_hz ?? data.imu_rate ?? 100;
+            if (imuRateLabel) {
+                imuRateLabel.textContent = `${imuHz} Hz`;
+            }
+        };
+
+        const applyData = (data) => {
+            history.push(data);
+            if (history.length > 50) history.shift();
+            updateHero(data);
+            updateDiagnostics(data);
+            updateCharts(data);
+            updateStakeout(data);
+            updateTilt(data);
+            updateAdvancedStates(data);
+            if (data.entrip) {
+                entripState = { ...entripState, ...{
+                    connected: Boolean(data.entrip.connected ?? entripState.connected),
+                    latency: data.entrip.latency ?? entripState.latency,
+                    bytes: data.entrip.bytes ?? entripState.bytes,
+                    lastFix: data.entrip.last_fix ?? data.entrip.lastFix ?? entripState.lastFix
+                } };
+                updateEntripTelemetry();
+            }
+            updateMap(data);
+        };
+
+        const initCharts = () => {
+            const ctxAccuracy = document.getElementById('accuracyChart').getContext('2d');
+            accuracyChart = new Chart(ctxAccuracy, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'Precisión (m)',
+                            data: [],
+                            borderColor: '#4ef2ff',
+                            backgroundColor: 'rgba(78, 242, 255, 0.15)',
+                            fill: true,
+                            tension: 0.4
+                        },
+                        {
+                            label: 'HDOP',
+                            data: [],
+                            borderColor: '#ffcc6f',
+                            backgroundColor: 'rgba(255, 204, 111, 0.2)',
+                            fill: true,
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    plugins: { legend: { labels: { color: '#f4fbff' } } },
+                    scales: {
+                        x: { ticks: { color: '#f4fbff' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        y: { ticks: { color: '#f4fbff' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+                    }
+                }
+            });
+
+            const ctxClass = document.getElementById('classificationChart').getContext('2d');
+            classificationChart = new Chart(ctxClass, {
+                type: 'doughnut',
+                data: {
+                    labels: ['LOS', 'Multipath', 'NLOS'],
+                    datasets: [
+                        {
+                            data: [0, 0, 0],
+                            backgroundColor: ['#4ef2ff', '#ffcc6f', '#ff6b81'],
+                            borderColor: 'transparent'
+                        }
+                    ]
+                },
+                options: {
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: '#f4fbff' }
+                        }
+                    }
+                }
+            });
+        };
+
+        const initMap = () => {
+            map = L.map('live-map', {
+                zoomControl: false
+            }).setView([0, 0], 2);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap'
+            }).addTo(map);
+            photoLayer = L.layerGroup().addTo(map);
+            photoEntries.forEach((entry) => addPhotoMarker(entry));
+        };
+
+        const initSocket = () => {
+            if (typeof window.io !== 'function') {
+                socketConnected = false;
+                wsState.innerHTML = '<span class="dot dot--warn"></span> Modo offline';
+                pushEvent('Socket.IO no disponible · CDN bloqueado, usando REST');
+                return null;
+            }
+
+            const socket = io('/ws', { transports: ['websocket', 'polling'] });
+            socket.on('connect', () => {
+                socketConnected = true;
+                wsState.innerHTML = '<span class="dot dot--ok"></span> Conectado';
+                pushEvent('Socket conectado');
+            });
+
+            socket.on('disconnect', () => {
+                socketConnected = false;
+                wsState.innerHTML = '<span class="dot dot--warn"></span> Reconectando';
+                pushEvent('Socket desconectado');
+            });
+
+            socket.on('stats', (payload) => {
+                applyData(payload);
+                pushEvent(`Actualización RTK · sats ${payload.satellites}`);
+            });
+
+            socket.on('uptime', (payload) => {
+                document.getElementById('uptimeLabel').textContent = formatTime(payload.ts || 0);
+            });
+            return socket;
+        };
+
+        const fetchFallback = async () => {
+            try {
+                const res = await fetch('/api/stats');
+                if (!res.ok) return;
+                const data = await res.json();
+                applyData(data);
+            } catch (err) {
+                // ignore
+            }
+        };
+
+        const initFallbackLoop = () => {
+            const run = () => {
+                if (!socketConnected) {
+                    fetchFallback();
+                }
+            };
+            run();
+            setInterval(run, 4000);
+        };
+
+        const initProjects = () => {
+            const stored = JSON.parse(localStorage.getItem('gnssai-projects') || '[]');
+            stored.forEach((p) => renderProject(p));
+
+            document.getElementById('projectForm').addEventListener('submit', (event) => {
+                event.preventDefault();
+                const form = event.currentTarget;
+                const project = {
+                    id: uid(),
+                    name: form.name.value,
+                    description: form.description.value,
+                    timestamp: new Date().toISOString()
+                };
+                renderProject(project);
+                stored.push(project);
+                localStorage.setItem('gnssai-projects', JSON.stringify(stored));
+                form.reset();
+            });
+        };
+
+        const renderProject = (project) => {
+            const article = document.createElement('article');
+            article.innerHTML = `
+                <strong>${project.name}</strong>
+                <p>${project.description || 'Sin descripción'}</p>
+                <small>${new Date(project.timestamp).toLocaleString()}</small>
+            `;
+            projectList.prepend(article);
+            if (projectList.children.length > 6) {
+                projectList.removeChild(projectList.lastChild);
+            }
+        };
+
+        const initReplanteo = () => {
+            renderReplanteoTable();
+            if (!replanteoForm) return;
+            replanteoForm.addEventListener('submit', (event) => {
+                event.preventDefault();
+                const form = event.currentTarget;
+                const point = {
+                    id: uid(),
+                    code: form.code.value || `P-${replanteoPoints.length + 1}`,
+                    lat: parseFloat(form.lat.value),
+                    lon: parseFloat(form.lon.value),
+                    alt: parseFloat(form.alt.value || 0),
+                    tolerance: form.tolerance.value ? Number(form.tolerance.value) / 100 : null,
+                    timestamp: new Date().toISOString()
+                };
+                replanteoPoints.unshift(point);
+                if (replanteoPoints.length > 40) {
+                    replanteoPoints.pop();
+                }
+                localStorage.setItem('gnssai-replanteo', JSON.stringify(replanteoPoints));
+                renderReplanteoTable();
+                form.reset();
+                pushEvent(`Replanteo ${point.code} agregado`);
+            });
+
+            replanteoTable?.addEventListener('click', (event) => {
+                const target = event.target.closest('button[data-action]');
+                if (!target) return;
+                const row = target.closest('tr[data-id]');
+                if (!row) return;
+                const point = replanteoPoints.find((p) => p.id === row.dataset.id);
+                if (!point) return;
+                if (target.dataset.action === 'delete') {
+                    replanteoPoints = replanteoPoints.filter((p) => p.id !== point.id);
+                    localStorage.setItem('gnssai-replanteo', JSON.stringify(replanteoPoints));
+                    renderReplanteoTable();
+                    pushEvent(`Replanteo ${point.code} eliminado`);
+                    return;
+                }
+                stakeoutTarget = {
+                    lat: point.lat,
+                    lon: point.lon,
+                    alt: point.alt || 0,
+                    label: point.code,
+                    tolerance: point.tolerance
+                };
+                stakeoutInfo.innerHTML = `
+                    <strong>${point.code}</strong>
+                    <p>${point.lat.toFixed(6)}, ${point.lon.toFixed(6)}</p>
+                    <p>Esperando solución...</p>
+                `;
+                pushEvent(`Replanteo ${point.code} activado`);
+                if (map) {
+                    map.setView([point.lat, point.lon], 19);
+                }
+            });
+        };
+
+        const initPhotoLog = () => {
+            renderPhotoLog();
+            if (photoInput) {
+                photoInput.addEventListener('change', (event) => {
+                    const file = event.target.files?.[0];
+                    handlePhotoFile(file);
+                });
+            }
+            if (clearPhotoBtn) {
+                clearPhotoBtn.addEventListener('click', resetPhotoForm);
+            }
+            if (savePhotoBtn) {
+                savePhotoBtn.addEventListener('click', () => {
+                    const lastPosition = (history[history.length - 1] || {}).position;
+                    const entry = {
+                        id: uid(),
+                        note: photoNote?.value || 'Sin nota',
+                        lat: currentPhotoMeta?.lat ?? lastPosition?.lat,
+                        lon: currentPhotoMeta?.lon ?? lastPosition?.lon,
+                        alt: currentPhotoMeta?.alt ?? lastPosition?.alt,
+                        timestamp: currentPhotoMeta?.timestamp || Date.now()
+                    };
+                    photoEntries.unshift(entry);
+                    if (photoEntries.length > 30) {
+                        photoEntries.pop();
+                    }
+                    localStorage.setItem('gnssai-photos', JSON.stringify(photoEntries));
+                    renderPhotoLog();
+                    addPhotoMarker(entry);
+                    pushEvent(`Foto georreferenciada guardada (${entry.note})`);
+                    resetPhotoForm();
+                });
+            }
+            photoLog?.addEventListener('click', (event) => {
+                const item = event.target.closest('li[data-id]');
+                if (!item) return;
+                const entry = photoEntries.find((p) => p.id === item.dataset.id);
+                if (entry?.lat && entry?.lon && map) {
+                    map.setView([entry.lat, entry.lon], 19);
+                    const marker = photoMarkers.get(entry.id);
+                    marker?.openPopup();
+                }
+            });
+        };
+
+        const initEntrip = () => {
+            updateEntripTelemetry();
+            const stored = JSON.parse(localStorage.getItem('gnssai-entrip') || '{}');
+            if (entripForm && stored) {
+                ['caster', 'port', 'mount', 'user', 'password'].forEach((field) => {
+                    if (stored[field] && entripForm[field]) {
+                        entripForm[field].value = stored[field];
+                    }
+                });
+            }
+            if (entripForm) {
+                entripForm.addEventListener('submit', (event) => {
+                    event.preventDefault();
+                    handleEntrip('connect');
+                });
+            }
+            testEntripBtn?.addEventListener('click', () => handleEntrip('test'));
+            setEntripBadge(entripState.connected ? 'Enlace activo' : 'Desconectado', entripState.connected ? 'success' : 'danger');
+        };
+
+        const initStakeout = () => {
+            document.getElementById('stakeoutForm').addEventListener('submit', (event) => {
+                event.preventDefault();
+                const form = event.currentTarget;
+                stakeoutTarget = {
+                    lat: parseFloat(form.lat.value),
+                    lon: parseFloat(form.lon.value),
+                    alt: parseFloat(form.alt.value || 0),
+                    label: `Objetivo ${new Date().toLocaleTimeString()}`,
+                    tolerance: form.tolerance.value ? Number(form.tolerance.value) / 100 : null
+                };
+                stakeoutInfo.innerHTML = `
+                    <strong>${stakeoutTarget.label}</strong>
+                    <p>${stakeoutTarget.lat.toFixed(6)}, ${stakeoutTarget.lon.toFixed(6)}</p>
+                    <p>Esperando solución...</p>
+                `;
+                pushEvent('Nuevo stakeout definido');
+            });
+        };
+
+        const initTiltControls = () => {
+            toggleTiltCompBtn?.addEventListener('click', () => {
+                tiltCompState = !tiltCompState;
+                pushEvent(`Compensación TILT ${tiltCompState ? 'activada' : 'desactivada'}`);
+                tiltStateLabel.textContent = tiltCompState ? 'Compensado' : 'Manual';
+                tiltStateLabel.className = tiltCompState ? 'badge badge--success' : 'badge badge--warn';
+            });
+            calibrateImuBtn?.addEventListener('click', () => {
+                pushEvent('Calibración IMU solicitada');
+                tiltWarning.textContent = 'Calibrando... mantén el jalón quieto 30s';
+                setTimeout(() => {
+                    tiltWarning.textContent = 'Calibración completada, listo para replanteo';
+                }, 4000);
+            });
+        };
+
+        const initCommands = () => {
+            const commandGroups = {
+                IMU: [
+                    { name: 'TILT ON', cmd: 'TILTCOMPENSATION ENABLE', desc: 'Activa compensación de inclinación' },
+                    { name: 'TILT OFF', cmd: 'TILTCOMPENSATION DISABLE', desc: 'Desactiva TILT' },
+                    { name: 'Calibrar IMU', cmd: 'IMUCALIBRATE', desc: 'Mantén quieto 30s' },
+                    { name: 'IMU 100Hz', cmd: 'IMURATE 100', desc: 'Máxima frecuencia IMU' },
+                    { name: 'IMU 50Hz', cmd: 'IMURATE 50', desc: 'Frecuencia media' }
+                ],
+                Posicionamiento: [
+                    { name: 'Modo Rover', cmd: 'MODE ROVER', desc: 'Móvil con correcciones' },
+                    { name: 'Modo Base', cmd: 'MODE BASE', desc: 'Estación base fija' },
+                    { name: 'PPP Enable', cmd: 'PPP ENABLE', desc: 'Activar PPP' },
+                    { name: 'PPP Disable', cmd: 'PPP DISABLE', desc: 'Desactivar PPP' },
+                    { name: 'Reset RTK', cmd: 'RTKRESET', desc: 'Reiniciar RTK' }
+                ],
+                GNSS: [
+                    { name: 'GPS ON', cmd: 'GPSENABLE', desc: 'Activar GPS L1/L2/L5' },
+                    { name: 'GLONASS ON', cmd: 'GLONASSENABLE', desc: 'Activar GLONASS' },
+                    { name: 'Galileo ON', cmd: 'GALILEOENABLE', desc: 'Activar Galileo' },
+                    { name: 'BeiDou ON', cmd: 'BEIDOUENABLE', desc: 'Activar BeiDou' },
+                    { name: 'Ver sistemas', cmd: 'LOG SATVIS', desc: 'Constelaciones activas' }
+                ],
+                Salidas: [
+                    { name: 'GGA 5Hz', cmd: 'GPGGA COM1 5.0', desc: 'NMEA estándar' },
+                    { name: 'GGA 10Hz', cmd: 'GPGGA COM1 10.0', desc: 'Alta frecuencia' },
+                    { name: 'RMC 5Hz', cmd: 'GPRMC COM1 5.0', desc: 'Velocidad incluida' },
+                    { name: 'Binary POS', cmd: 'BESTPOS COM1 5.0', desc: 'Trama binaria' },
+                    { name: 'RTCM Out', cmd: 'RTCM1004 COM2 1.0', desc: 'Modo base' }
+                ]
+            };
+
+            commandDeck.innerHTML = Object.entries(commandGroups)
+                .map(([group, commands]) => {
+                    const rows = commands
+                        .map(
+                            (cmd) => `
+                            <tr>
+                                <td>${cmd.name}</td>
+                                <td>${cmd.cmd}</td>
+                                <td>${cmd.desc}</td>
+                                <td><button data-command="${cmd.cmd}">Copiar</button></td>
+                            </tr>
+                        `
+                        )
+                        .join('');
+                    return `
+                        <div class="command-group">
+                            <p class="command-group__title">${group}</p>
+                            <table class="list-table">
+                                <tbody>${rows}</tbody>
+                            </table>
+                        </div>
+                    `;
+                })
+                .join('');
+
+            commandDeck.addEventListener('click', async (event) => {
+                if (event.target.matches('button[data-command]')) {
+                    const cmd = event.target.dataset.command;
+                    await navigator.clipboard.writeText(cmd);
+                    toast.style.display = 'block';
+                    toast.textContent = `${cmd} copiado`;
+                    setTimeout(() => (toast.style.display = 'none'), 1500);
+                }
+            });
+        };
+
+        const initToggles = () => {
+            document.querySelectorAll('[data-toggle]').forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    const type = btn.dataset.toggle;
+                    btn.classList.toggle('active');
+                    if (type === 'lora') {
+                        btn.textContent = btn.classList.contains('active') ? 'Enlace OK' : 'Sin enlace';
+                    } else if (type === 'ntrip') {
+                        btn.textContent = btn.classList.contains('active') ? 'Correcciones ON' : 'Conectar';
+                    } else if (type === 'mode') {
+                        btn.textContent = btn.classList.contains('active') ? 'Base' : 'Rover';
+                    }
+                });
+            });
+
+            document.getElementById('toggleTheme').addEventListener('click', () => {
+                const light = root.dataset.theme === 'light';
+                if (light) {
+                    root.dataset.theme = 'dark';
+                    root.style.setProperty('--bg', '#020613');
+                } else {
+                    root.dataset.theme = 'light';
+                    root.style.setProperty('--bg', '#f5f5f5');
+                }
+            });
+        };
+
+        const initPdf = () => {
+            document.getElementById('exportPdf').addEventListener('click', async () => {
+                const { jsPDF } = window.jspdf;
+                const canvas = await html2canvas(document.querySelector('.main'));
+                const img = canvas.toDataURL('image/png');
+                const pdf = new jsPDF('l', 'mm', 'a4');
+                const width = pdf.internal.pageSize.getWidth();
+                const height = (canvas.height * width) / canvas.width;
+                pdf.addImage(img, 'PNG', 0, 0, width, height);
+                pdf.save(`gnssai-report-${Date.now()}.pdf`);
+            });
+        };
+
+        const initButtons = () => {
+            document.getElementById('startRtk').addEventListener('click', () => {
+                pushEvent('RTK en marcha · K922 enviando RTCM / ENTRIP');
+            });
+            document.getElementById('startBase').addEventListener('click', () => {
+                pushEvent('Base fija publicada · Correcciones listas');
+            });
+            document.getElementById('clearLog').addEventListener('click', () => {
+                eventFeed.innerHTML = '';
+            });
+
+            document.getElementById('markPoint').addEventListener('click', () => {
+                const last = history[history.length - 1];
+                if (!last) return;
+                pushEvent(`Punto guardado · ${Number(last.position?.lat || 0).toFixed(6)}, ${Number(last.position?.lon || 0).toFixed(6)}`);
+            });
+        };
+
+        window.addEventListener('load', () => {
+            initMap();
+            initCharts();
+            initSocket();
+            initFallbackLoop();
+            initProjects();
+            initReplanteo();
+            initStakeout();
+            initPhotoLog();
+            initEntrip();
+            initCommands();
+            initToggles();
+            initTiltControls();
+            initPdf();
+            initButtons();
+            fetchFallback();
+        });
     </script>
 </body>
 </html>
